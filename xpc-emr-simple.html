@@ -2252,7 +2252,7 @@
                 
                 <!-- Panel Tabs -->
                 <div class="panel-tabs" id="panel-tabs">
-                    <div class="panel-tab active" data-panel="actions" title="Actions">
+                    <div class="panel-tab active" data-panel="orders" title="Actions">
                         <i data-lucide="play" style="width: 18px; height: 18px;"></i>
                     </div>
                     <div class="panel-tab" data-panel="variables" title="Variables">
@@ -2265,7 +2265,7 @@
                 
                 <div class="flex-1 overflow-y-auto" id="right-sidebar-content">
                     <!-- Orders Panel - Actions/Commands -->
-                    <div id="orders-panel" style="display: none;">
+                    <div id="orders-panel" style="display: block;">
                         <div class="orders-panel">
                             <div class="orders-input-container">
                                 <div class="orders-input-wrapper">
@@ -2292,7 +2292,7 @@
                     </div>
                     
                     <!-- Action Panel - Suggested Extractions -->
-                    <div id="action-panel" style="display: block;">
+                    <div id="action-panel" style="display: none;">
                         <!-- Extractions will be dynamically added here -->
                     </div>
                     
@@ -4622,7 +4622,7 @@
         // Function to open action panel (suggestions)
         function openActionPanel() {
             resetSidebarContentContainer();
-            
+
             const ordersPanel = document.getElementById('orders-panel');
             const actionPanel = document.getElementById('action-panel');
             const variablesList = document.getElementById('variables-list');
@@ -4633,9 +4633,9 @@
             const addTemplateBtn = document.getElementById('add-template-btn');
             const sidebarTitle = document.getElementById('right-sidebar-title');
             const panelTabs = document.getElementById('panel-tabs');
-            
-            if (ordersPanel) ordersPanel.style.display = 'none';
-            if (actionPanel) actionPanel.style.display = 'block';
+
+            if (ordersPanel) ordersPanel.style.display = 'block';
+            if (actionPanel) actionPanel.style.display = 'none';
             if (variablesList) variablesList.style.display = 'none';
             if (templatesList) templatesList.style.display = 'none';
             if (aiPanel) aiPanel.style.display = 'none';
@@ -4648,21 +4648,16 @@
                 sidebarTitle.style.display = 'none';
             }
             if (panelTabs) panelTabs.style.display = 'flex';
-            
+
             // Update tab active state
             panelTabs?.querySelectorAll('.panel-tab').forEach(t => {
-                t.classList.toggle('active', t.dataset.panel === 'actions');
+                t.classList.toggle('active', t.dataset.panel === 'orders');
             });
-            
+
             // Open sidebar if collapsed
             const rightSidebar = document.getElementById('right-sidebar');
             if (rightSidebar && rightSidebar.classList.contains('collapsed')) {
                 rightSidebar.classList.remove('collapsed');
-            }
-            
-            // Render action panel
-            if (typeof renderActionPanel === 'function') {
-                renderActionPanel();
             }
         }
         
@@ -5308,22 +5303,21 @@
         // Initialize variable system
         setupVariableSystem();
         
-        // Initialize right sidebar to show action panel (suggestions) by default
+        // Initialize right sidebar to show orders panel by default
+        const ordersPanel = document.getElementById('orders-panel');
         const actionPanel = document.getElementById('action-panel');
         const variablesList = document.getElementById('variables-list');
         const templatesList = document.getElementById('templates-list');
         const addVariableBtn = document.getElementById('add-variable-btn');
         const addTemplateBtn = document.getElementById('add-template-btn');
         const patientEditor = document.getElementById('patient-editor');
-        if (actionPanel) actionPanel.style.display = 'block';
+        if (ordersPanel) ordersPanel.style.display = 'block';
+        if (actionPanel) actionPanel.style.display = 'none';
         if (variablesList) variablesList.style.display = 'none';
         if (templatesList) templatesList.style.display = 'none';
         if (addVariableBtn) addVariableBtn.style.display = 'none';
         if (addTemplateBtn) addTemplateBtn.style.display = 'none';
         if (patientEditor) patientEditor.style.display = 'none';
-
-        // Render action panel with initial state
-        renderActionPanel();
 
         // ===== SELECTION TOOLBAR FOR CREATING VARIABLES =====
         function setupSelectionToolbar() {
@@ -5755,20 +5749,6 @@
                     if (sidebarTitle) {
                         sidebarTitle.style.display = 'none';
                     }
-                } else if (panel === 'actions') {
-                    if (ordersPanel) ordersPanel.style.display = 'none';
-                    if (actionPanel) actionPanel.style.display = 'block';
-                    if (variablesList) variablesList.style.display = 'none';
-                    if (templatesList) templatesList.style.display = 'none';
-                    if (aiPanel) aiPanel.style.display = 'none';
-                    if (addVariableBtn) addVariableBtn.style.display = 'none';
-                    if (addTemplateBtn) addTemplateBtn.style.display = 'none';
-                    const variablesHeader = document.querySelector('.variables-header');
-                    if (variablesHeader) variablesHeader.style.display = 'none';
-                    if (sidebarTitle) {
-                        sidebarTitle.style.display = 'none';
-                    }
-                    renderActionPanel();
                 } else if (panel === 'variables') {
                     if (ordersPanel) ordersPanel.style.display = 'none';
                     if (actionPanel) actionPanel.style.display = 'none';
