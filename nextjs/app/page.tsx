@@ -5,7 +5,7 @@ import { initializeSampleData } from '@/data/seed-data';
 import { TopBar } from '@/components/layout/TopBar';
 import { LeftSidebar } from '@/components/layout/LeftSidebar';
 import { RightSidebar } from '@/components/layout/RightSidebar';
-import { PatientEditor } from '@/components/patient/PatientEditor';
+import { PatientCreationDialog } from '@/components/patient/PatientCreationDialog';
 import { PatientSummary } from '@/components/editor/PatientSummary';
 import { RichEditor } from '@/components/editor/RichEditor';
 
@@ -41,8 +41,8 @@ export default function HomePage() {
         onAddPatient={() => setPatientEditorOpen(true)}
       />
 
-      {/* Patient Editor Dialog */}
-      <PatientEditor
+      {/* Patient Creation Dialog */}
+      <PatientCreationDialog
         open={patientEditorOpen}
         onOpenChange={setPatientEditorOpen}
         onPatientCreated={handlePatientCreated}

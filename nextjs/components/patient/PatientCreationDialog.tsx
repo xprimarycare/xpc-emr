@@ -15,17 +15,17 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import type { Patient } from '@/lib/types';
 
-interface PatientEditorProps {
+interface PatientCreationProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onPatientCreated?: (patientId: string) => void;
 }
 
-export function PatientEditor({
+export function PatientCreationDialog({
   open,
   onOpenChange,
   onPatientCreated,
-}: PatientEditorProps) {
+}: PatientCreationProps) {
   const [name, setName] = useState('');
   const [mrn, setMrn] = useState('');
   const [dob, setDob] = useState('');
