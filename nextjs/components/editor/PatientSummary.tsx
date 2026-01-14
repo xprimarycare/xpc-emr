@@ -28,7 +28,8 @@ export function PatientSummary({ patientId }: PatientSummaryProps) {
     if (patientId && debouncedSummary && debouncedSummary !== summary) {
       saveSummary.mutate({ patientId, summary: debouncedSummary });
     }
-  }, [debouncedSummary, patientId, summary, saveSummary]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debouncedSummary, patientId, summary]);
 
   const handleInput = () => {
     if (contentRef.current) {

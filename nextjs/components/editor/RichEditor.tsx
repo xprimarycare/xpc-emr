@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useTabs, useSaveTab } from '@/hooks/useTabs';
-import { useVariables } from '@/hooks/useVariables';
 import { useDebounce } from '@/hooks/useDebounce';
 import type { Tab } from '@/lib/types';
 
@@ -13,7 +12,6 @@ interface RichEditorProps {
 
 export function RichEditor({ patientId, activeTabId }: RichEditorProps) {
   const { data: tabs = [] } = useTabs(patientId);
-  const { data: variables = {} } = useVariables(patientId);
   const saveTab = useSaveTab();
   const [localContent, setLocalContent] = useState('');
   const contentRef = useRef<HTMLDivElement>(null);
@@ -27,6 +25,7 @@ export function RichEditor({ patientId, activeTabId }: RichEditorProps) {
       contentRef.current.innerHTML = activeTab.content || '';
       setLocalContent(activeTab.content || '');
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab?.id]); // Only trigger on tab ID change
 
   // Save debounced content
@@ -38,7 +37,8 @@ export function RichEditor({ patientId, activeTabId }: RichEditorProps) {
       };
       saveTab.mutate({ patientId, tab: updatedTab });
     }
-  }, [debouncedContent, patientId, activeTab, saveTab]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debouncedContent, patientId, activeTab]);
 
   const handleInput = () => {
     if (contentRef.current) {
