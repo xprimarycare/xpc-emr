@@ -1,9 +1,7 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef} from 'react';
 import { useTabs, useSaveTab } from '@/hooks/useTabs';
-import { useDebounce } from '@/hooks/useDebounce';
-import type { Tab } from '@/lib/types';
 
 interface RichEditorProps {
   patientId: string | null;
@@ -13,9 +11,8 @@ interface RichEditorProps {
 export function RichEditor({ patientId, activeTabId }: RichEditorProps) {
   const { data: tabs = [] } = useTabs(patientId);
   const saveTab = useSaveTab();
-  const [localContent, setLocalContent] = useState('');
   const contentRef = useRef<HTMLDivElement>(null);
-  const debouncedContent = useDebounce(localContent, 1000);
+  // const debouncedContent = useDebounce(localContent, 1000);
 
   const activeTab = tabs.find((t) => t.id === activeTabId);
 
@@ -23,24 +20,13 @@ export function RichEditor({ patientId, activeTabId }: RichEditorProps) {
   useEffect(() => {
     if (activeTab && contentRef.current) {
       contentRef.current.innerHTML = activeTab.content || '';
-      setLocalContent(activeTab.content || '');
     }
   }, [activeTab?.id]); // Only trigger on tab ID change
 
-  // Save debounced content
-  useEffect(() => {
-    if (patientId && activeTab && debouncedContent !== activeTab.content) {
-      const updatedTab: Tab = {
-        ...activeTab,
-        content: debouncedContent,
-      };
-      saveTab.mutate({ patientId, tab: updatedTab });
-    }
-  }, [debouncedContent, patientId, activeTab, saveTab]);
 
   const handleInput = () => {
-    if (contentRef.current) {
-      setLocalContent(contentRef.current.innerHTML);
+    if (contentRef.current && patientId && activeTab) {
+      saveTab.mutate({ patientId, tab: { ...activeTab, content: contentRef.current.innerHTML } });
     }
   };
 

@@ -80,6 +80,7 @@ export class LocalStorageRepository implements IEMRRepository {
   private async savePatientData(patientId: string, data: Partial<PatientData>): Promise<void> {
     const currentData = await this.getPatientData(patientId);
     const updatedData = { ...currentData, ...data };
+    console.log('Saving patient data:', updatedData);
     this.setItem(STORAGE_KEYS.PATIENT_DATA(patientId), updatedData);
   }
 
