@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useTabs, useSaveTab } from '@/hooks/useTabs';
-import { useVariables } from '@/hooks/useVariables';
 import { useDebounce } from '@/hooks/useDebounce';
 import type { Tab } from '@/lib/types';
 
@@ -13,7 +12,6 @@ interface RichEditorProps {
 
 export function RichEditor({ patientId, activeTabId }: RichEditorProps) {
   const { data: tabs = [] } = useTabs(patientId);
-  const { data: variables = {} } = useVariables(patientId);
   const saveTab = useSaveTab();
   const [localContent, setLocalContent] = useState('');
   const contentRef = useRef<HTMLDivElement>(null);
