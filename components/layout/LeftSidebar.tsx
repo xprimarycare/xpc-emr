@@ -89,11 +89,13 @@ export function LeftSidebar() {
   const handleDeleteTab = (tabId: string) => {
     if (!activePatient) return;
     deleteTab(activePatient.id, tabId);
-    // If deleting active tab, switch to first available tab
-    if (tabId === activeTabId && activePatient.tabs.length > 1) {
+    // If deleting active tab, switch to first available tab or clear
+    if (tabId === activeTabId) {
       const remainingTabs = activePatient.tabs.filter(t => t.id !== tabId);
       if (remainingTabs.length > 0) {
         setActiveTabId(remainingTabs[0].id);
+      } else {
+        setActiveTabId(null); // Clear active tab when deleting the last one
       }
     }
   };
