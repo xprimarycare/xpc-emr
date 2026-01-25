@@ -37,10 +37,14 @@ export function PatientProvider({ children }: { children: ReactNode }) {
   };
 
   const removePatient = (id: string) => {
-    setPatients(prev => prev.filter(p => p.id !== id));
-    if (activePatientId === id) {
-      setActivePatientId(patients[0]?.id || null);
-    }
+    setPatients(prev => {
+      const updated = prev.filter(p => p.id !== id);
+      // If removing the active patient, switch to the first remaining patient
+      if (activePatientId === id) {
+        setActivePatientId(updated[0]?.id || null);
+      }
+      return updated;
+    });
   };
 
   const updatePatient = (id: string, updates: Partial<PatientData>) => {
