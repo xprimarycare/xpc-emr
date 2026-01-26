@@ -104,8 +104,8 @@ export function VariablesPanel() {
       // Update existing
       updateVariable(editingName, htmlContent);
     } else {
-      // Add new
-      addVariable(nameInput.trim().toLowerCase().replace(/\s+/g, '_'), htmlContent);
+      // Add new (pass isPinned state)
+      addVariable(nameInput.trim().toLowerCase().replace(/\s+/g, '_'), htmlContent, isPinned);
     }
 
     setIsEditing(false);

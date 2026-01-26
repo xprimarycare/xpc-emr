@@ -17,7 +17,7 @@ interface SidebarContextType {
   orders: Order[];
   addOrder: (order: Order) => void;
   removeOrder: (id: string) => void;
-  addVariable: (name: string, content: string) => void;
+  addVariable: (name: string, content: string, isPinned?: boolean) => void;
   updateVariable: (name: string, content: string) => void;
   deleteVariable: (name: string) => void;
   toggleVariablePin: (name: string) => void;
@@ -60,13 +60,13 @@ export function SidebarProvider({ children }: { children: ReactNode }) {
     setOrders(prev => prev.filter(o => o.id !== id));
   };
 
-  const addVariable = (name: string, content: string) => {
+  const addVariable = (name: string, content: string, isPinned: boolean = false) => {
     setVariables(prev => ({
       ...prev,
       [name]: {
         name,
         content,
-        isPinned: false
+        isPinned
       }
     }));
   };
