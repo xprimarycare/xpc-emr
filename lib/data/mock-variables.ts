@@ -55,8 +55,8 @@ export const mockVariables: Record<string, Variable> = {
 };
 
 export const mockTemplates: Record<string, Template> = {
-  soap: {
-    name: 'soap',
+  soap_note: {
+    name: 'soap_note',
     content: `<p><strong>Subjective:</strong></p>
 <p>[Patient's chief complaint and history]</p>
 <br>
@@ -71,10 +71,10 @@ export const mockTemplates: Record<string, Template> = {
     isPinned: true,
     icon: '📝'
   },
-  followup: {
-    name: 'followup',
+  follow_up: {
+    name: 'follow_up',
     content: `<p><strong>Follow-up Visit</strong></p>
-<p>Patient returns for follow-up of [condition].</p>
+<p><strong>Chief Complaint:</strong> [Reason for visit]</p>
 <br>
 <p><strong>Interval History:</strong></p>
 <p>[Changes since last visit]</p>
@@ -85,19 +85,20 @@ export const mockTemplates: Record<string, Template> = {
 <p><strong>Plan:</strong></p>
 <p>• Continue current medications</p>
 <p>• Follow up in [timeframe]</p>`,
-    isPinned: true,
+    isPinned: false,
     icon: '🔄'
   },
-  physicalExam: {
-    name: 'physicalExam',
-    content: `<p><strong>Physical Examination</strong></p>
-<p><strong>General:</strong> Alert, oriented, no acute distress</p>
-<p><strong>HEENT:</strong> Normocephalic, atraumatic</p>
-<p><strong>CV:</strong> RRR, no murmurs</p>
-<p><strong>Pulm:</strong> Clear to auscultation bilaterally</p>
-<p><strong>Abd:</strong> Soft, non-tender, non-distended</p>
-<p><strong>Neuro:</strong> Cranial nerves II-XII intact</p>`,
+  hpi: {
+    name: 'hpi',
+    content: `<p><strong>History of Present Illness</strong></p>
+<p><strong>Location:</strong> [Where is the symptom?]</p>
+<p><strong>Quality:</strong> [What does it feel like?]</p>
+<p><strong>Severity:</strong> [Scale of 1-10]</p>
+<p><strong>Duration:</strong> [How long?]</p>
+<p><strong>Onset:</strong> [When did it start?]</p>
+<p><strong>Modifying factors:</strong> [What makes it better/worse?]</p>
+<p><strong>Associated symptoms:</strong> [Other symptoms]</p>`,
     isPinned: false,
-    icon: '🩺'
+    icon: '📋'
   }
 };

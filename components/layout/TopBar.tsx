@@ -48,8 +48,8 @@ export function TopBar() {
 
   return (
     <div className="border-b bg-white">
-      <div className="flex items-center justify-between px-4 py-3">
-        <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 px-4 py-3">
+        <div className="flex items-center gap-3 shrink-0">
           <button
             onClick={toggleLeftSidebar}
             className="p-1 hover:bg-gray-100 rounded"
@@ -63,17 +63,20 @@ export function TopBar() {
           >
             <Plus size={20} className="text-gray-600" />
           </button>
-          <div className="relative ml-2">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
-            <input
-              type="text"
-              placeholder="Search patient.."
-              className="pl-9 pr-4 py-1.5 bg-gray-50 border-0 rounded-md text-sm w-96 focus:outline-none focus:ring-2 focus:ring-gray-200"
-            />
-          </div>
         </div>
-        <div className="flex items-center gap-2">
-          <button className="p-2 hover:bg-gray-100 rounded">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
+          <input
+            type="text"
+            placeholder="Search patient.."
+            className="pl-9 pr-4 py-1.5 bg-gray-50 border-0 rounded-md text-sm w-full focus:outline-none focus:ring-2 focus:ring-gray-200"
+          />
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            className="p-2 hover:bg-gray-100 rounded"
+            onClick={() => toggleRightPanel('ai')}
+          >
             <Lightbulb size={20} className="text-gray-600" />
           </button>
           <button

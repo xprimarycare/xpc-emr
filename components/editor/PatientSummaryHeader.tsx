@@ -28,19 +28,19 @@ export function PatientSummaryHeader() {
   return (
     <div className="border-b bg-white px-8 py-4">
       {isEditing ? (
-        <input
-          type="text"
+        <textarea
           value={summary}
           onChange={(e) => setSummary(e.target.value)}
           onBlur={handleBlur}
           autoFocus
-          className="w-full text-center text-sm text-gray-900 focus:outline-none"
+          rows={summary.split('\n').length || 1}
+          className="w-full text-center text-sm text-gray-900 focus:outline-none resize-none"
           placeholder="Add patient one-liner..."
         />
       ) : (
         <div
           onClick={() => setIsEditing(true)}
-          className="text-center text-sm text-gray-400 cursor-text hover:text-gray-600"
+          className="text-center text-sm text-gray-400 cursor-text hover:text-gray-600 whitespace-pre-wrap"
         >
           {placeholder}
         </div>

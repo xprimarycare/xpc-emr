@@ -55,23 +55,53 @@ XPC EMR (Pineapple J) is a Google Docs-style medical documentation system design
 ### 🧩 Variables System
 - **@-mention Autocomplete** - Type @ to insert variables
 - **Predefined Variables** - Medications, care team, allergies, vitals, PMH
-- **Editable Variables** - Update variable content in right panel
-- **Pinned Variables** - Pin frequently used variables
+- **Add Variables** - Create new variables with inline editor form
+- **Edit Variables** - Click any variable to edit its content
+- **Delete Variables** - Remove variables from the editor
+- **Pin Variables** - Pin frequently used variables to the top
+  - Yellow highlight for pinned variables
+  - Amber left border indicator
+  - Pin icon in editor and list
+  - Auto-sort with pinned items first
+- **Auto-scroll** - Editor scrolls to top when editing any variable
 
 ### 📋 Templates
-- **Reusable Templates** - SOAP notes, follow-up visits, physical exam
-- **Template Library** - Browse and insert templates
-- **Template Preview** - View template content before inserting
+- **#template_name Format** - Templates displayed with hash prefix in amber color
+- **Reusable Templates** - SOAP notes, follow-up visits, HPI templates
+- **Pinned Templates** - Yellow highlight with pin icon for favorites
+- **Template Preview** - Content preview with truncation
+- **Add Template** - Blue button to create new templates
 
-### 📦 Orders Panel
-- **Order Entry** - Command-line style order input
-- **Order Types** - Labs, referrals, prescriptions, scheduling
+### ⚡ Actions Panel (Orders)
+- **Command Input** - Large textarea for natural language commands
+- **Example Commands** - Helpful examples displayed:
+  - `order CBC, CMP, lipid panel`
+  - `refer to cardiology`
+  - `rx metformin 500mg bid`
+  - `schedule follow-up 2 weeks`
+- **Pending Actions** - Visual list of queued orders
 - **Smart Parsing** - Auto-detect order type from keywords
-- **Order Management** - View and remove orders
+- **Order Management** - View and remove pending orders
+
+### 🤖 AI Assistant Panel
+- **Chat Interface** - Conversational UI for patient queries
+- **Welcome Message** - Helpful onboarding with query suggestions
+- **Query Examples**:
+  - Current medications
+  - Recent visit summaries
+  - Care gaps and screenings due
+  - Lab results and trends
+- **Quick Suggestion Buttons** - One-click queries for common topics
+- **Message History** - Scrollable conversation with timestamps
+- **Simulated Responses** - Context-aware AI responses based on query type
 
 ### 🎨 UI/UX Features
 - **Clean Design** - Minimal, distraction-free interface
 - **Responsive Layout** - Top bar, left sidebar, main editor, right panel
+- **Full-Width Search** - Search bar expands to fill available space
+- **Multi-line Patient Summary** - Support for multiple lines in one-liner section
+- **Icon-Only Tabs** - Spaced icon tabs in right panel (Actions, Variables, Templates)
+- **Collapsible Right Panel** - Panel completely hides when closed
 - **Smooth Animations** - Transitions for hover states and interactions
 - **Visual Feedback** - Active states, hover effects, drag indicators
 - **Icon System** - Lucide React icons throughout
@@ -107,6 +137,7 @@ XPC EMR (Pineapple J) is a Google Docs-style medical documentation system design
 │   │   ├── PatientInfoTab.tsx
 │   │   └── NewPatientForm.tsx
 │   ├── panels/
+│   │   ├── AIPanel.tsx
 │   │   ├── OrdersPanel.tsx
 │   │   ├── VariablesPanel.tsx
 │   │   └── TemplatesPanel.tsx
@@ -145,10 +176,11 @@ XPC EMR (Pineapple J) is a Google Docs-style medical documentation system design
 - Left sidebar visibility
 
 #### SidebarContext
-- Right panel state
-- Variables and templates
-- Orders management
-- Panel type switching
+- Right panel state (open/closed, panel type)
+- Variables management (add, update, delete, toggle pin)
+- Templates storage
+- Orders management (add, remove)
+- Panel type switching (actions, variables, templates, ai)
 
 ## 🚀 Getting Started
 
@@ -208,28 +240,60 @@ npm start
 2. Click **⋮** (three dots)
 3. Select action from menu
 
+### Using the Right Panel
+1. Click the **columns icon** (⬚⬚) in top bar to open Variables panel
+2. Click the **lightbulb icon** (💡) to open AI Assistant
+3. Switch between tabs using icon buttons:
+   - **▷** Actions - Enter orders and commands
+   - **<>** Variables - Manage @-mention variables
+   - **📄** Templates - Browse #templates
+
+### Managing Variables
+1. Click **+ Add Variable** button
+2. Enter variable name and content
+3. Click **pin icon** to pin/unpin
+4. Click **Save** to create
+5. Click any existing variable to edit
+6. Pinned variables appear at top with yellow highlight
+
+### Using AI Assistant
+1. Click lightbulb icon in top bar
+2. Type a question about patient data
+3. Or click quick suggestion buttons:
+   - Medications
+   - Visits
+   - Care gaps
+4. View AI responses in chat format
+
 ## 🎯 Roadmap
 
 ### Completed ✅
 - Multi-patient tabs
 - Document editor
-- Variables system
-- Templates
-- Orders panel
+- Variables system with full CRUD operations
+- Pin/unpin variables with visual indicators
+- Templates panel with pinning
+- Actions/Orders panel with command input
+- AI Assistant chat panel
 - Star pages
 - Context menu
 - Drag & drop reordering
 - Page renaming
 - Section management
+- Multi-line patient summary
+- Full-width search bar
+- Icon-only panel tabs
+- Auto-scroll to editor
 
 ### Planned 🚧
 - Subtabs/hierarchical pages
-- AI query panel
 - Working search filter
 - Selection toolbar
-- Enhanced variable editing
+- @-mention variable insertion in editor
+- Template insertion in editor
 - Keyboard shortcuts
 - Timeline view
+- Real AI integration
 - Analytics dashboard
 
 ## 🤝 Contributing

@@ -5,7 +5,7 @@ import { Variable, Template } from '../types/variable';
 import { Order } from '../types/order';
 import { mockVariables, mockTemplates } from '../data/mock-variables';
 
-type RightPanelType = 'orders' | 'variables' | 'templates' | null;
+type RightPanelType = 'orders' | 'variables' | 'templates' | 'ai' | null;
 
 interface SidebarContextType {
   rightPanelOpen: boolean;
@@ -17,7 +17,10 @@ interface SidebarContextType {
   orders: Order[];
   addOrder: (order: Order) => void;
   removeOrder: (id: string) => void;
+  addVariable: (name: string, content: string) => void;
   updateVariable: (name: string, content: string) => void;
+  deleteVariable: (name: string) => void;
+  toggleVariablePin: (name: string) => void;
 }
 
 const SidebarContext = createContext<SidebarContextType | undefined>(undefined);
@@ -57,12 +60,41 @@ export function SidebarProvider({ children }: { children: ReactNode }) {
     setOrders(prev => prev.filter(o => o.id !== id));
   };
 
+  const addVariable = (name: string, content: string) => {
+    setVariables(prev => ({
+      ...prev,
+      [name]: {
+        name,
+        content,
+        isPinned: false
+      }
+    }));
+  };
+
   const updateVariable = (name: string, content: string) => {
     setVariables(prev => ({
       ...prev,
       [name]: {
         ...prev[name],
         content
+      }
+    }));
+  };
+
+  const deleteVariable = (name: string) => {
+    setVariables(prev => {
+      const updated = { ...prev };
+      delete updated[name];
+      return updated;
+    });
+  };
+
+  const toggleVariablePin = (name: string) => {
+    setVariables(prev => ({
+      ...prev,
+      [name]: {
+        ...prev[name],
+        isPinned: !prev[name]?.isPinned
       }
     }));
   };
@@ -79,7 +111,10 @@ export function SidebarProvider({ children }: { children: ReactNode }) {
         orders,
         addOrder,
         removeOrder,
-        updateVariable
+        addVariable,
+        updateVariable,
+        deleteVariable,
+        toggleVariablePin
       }}
     >
       {children}
