@@ -42,7 +42,7 @@ export function NewPatientForm({ patientId }: { patientId: string }) {
 
         <form onSubmit={handleSubmit} className="space-y-6">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-foreground mb-2">
               Patient Name <span className="text-red-500">*</span>
             </label>
             <input
@@ -55,7 +55,7 @@ export function NewPatientForm({ patientId }: { patientId: string }) {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-foreground mb-2">
               MRN
             </label>
             <input
@@ -68,7 +68,7 @@ export function NewPatientForm({ patientId }: { patientId: string }) {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-foreground mb-2">
               Date of Birth
             </label>
             <input
@@ -81,7 +81,7 @@ export function NewPatientForm({ patientId }: { patientId: string }) {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-foreground mb-2">
               Sex
             </label>
             <select

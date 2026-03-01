@@ -40,7 +40,7 @@ export function PatientSummaryHeader() {
       ) : (
         <div
           onClick={() => setIsEditing(true)}
-          className="text-center text-sm text-gray-400 cursor-text hover:text-gray-600 whitespace-pre-wrap"
+          className="text-center text-sm text-muted-foreground cursor-text hover:text-foreground whitespace-pre-wrap"
         >
           {placeholder}
         </div>

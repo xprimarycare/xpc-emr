@@ -108,7 +108,7 @@ export function PatientInfoTab() {
 
           <form onSubmit={handleSubmit} className="space-y-6">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-foreground mb-2">
                 Patient Name <span className="text-red-500">*</span>
               </label>
               <input
@@ -121,7 +121,7 @@ export function PatientInfoTab() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-foreground mb-2">
                 MRN
               </label>
               <input
@@ -134,7 +134,7 @@ export function PatientInfoTab() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-foreground mb-2">
                 Date of Birth
               </label>
               <input
@@ -146,7 +146,7 @@ export function PatientInfoTab() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-foreground mb-2">
                 Sex
               </label>
               <select
@@ -170,7 +170,7 @@ export function PatientInfoTab() {
             </button>
 
             {saveStatus === 'idle' && (
-              <p className="text-xs text-gray-400 text-center">
+              <p className="text-xs text-muted-foreground text-center">
                 {isFhirPatient ? 'Changes will be saved to Medplum' : 'Patient will be created in Medplum'}
               </p>
             )}

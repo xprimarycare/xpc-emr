@@ -31,7 +31,7 @@ export function PatientTab({ patient, isActive, onClick, onClose }: PatientTabPr
       </div>
       <div className="flex flex-col min-w-0">
         <span className="text-sm font-medium truncate">{patient.name}</span>
-        <span className="text-xs text-gray-600">{subtitle}</span>
+        <span className="text-xs text-muted-foreground">{subtitle}</span>
       </div>
       {onClose && (
         <button

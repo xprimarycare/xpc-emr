@@ -170,7 +170,7 @@
 
   [contenteditable]:empty:before {
     content: attr(data-placeholder);
-    @apply text-gray-400;
+    @apply text-muted-foreground;
   }
 
   /* Line clamp utilities */
