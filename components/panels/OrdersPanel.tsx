@@ -45,8 +45,7 @@ const exampleCommands = [
   'order CBC, CMP, lipid panel',
   'MRI brain, CT abdomen, CXR',
   'refer to cardiology',
-  'rx metformin 500mg bid',
-  'schedule follow-up 2 weeks'
+  'rx metformin 500mg bid'
 ];
 
 function detectOrderType(text: string): OrderType {
