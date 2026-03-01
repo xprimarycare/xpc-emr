@@ -1,0 +1,16 @@
+export interface Variable {
+  name: string;
+  content: string;
+  isPinned?: boolean;
+  icon?: string;
+}
+
+export interface Template {
+  name: string;
+  content: string;
+  isPinned?: boolean;
+  icon?: string;
+}
+
+export type VariableMap = Record<string, Variable | string>;
+export type TemplateMap = Record<string, Template | string>;
