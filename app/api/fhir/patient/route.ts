@@ -19,14 +19,27 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // Pass FHIR search params via requestOptions.queryParams so they
+    // go directly onto the URL (the SDK's query_parameters wrapper
+    // doesn't reliably forward to Medplum).
+    const fhirParams: Record<string, string> = {
+      _count: "200",
+    };
+    if (patientId) {
+      fhirParams._id = patientId;
+    }
+    if (name) {
+      fhirParams.name = name;
+    }
+
     const result = await phenomlClient.fhir.search(
       providerId,
       "Patient",
-      {}
+      {},
+      { queryParams: fhirParams }
     );
 
-    // Filter server-side since PhenoML SDK query_parameters
-    // doesn't reliably forward FHIR search params
+    // Fallback: filter locally in case PhenoML SDK doesn't forward params
     const bundle = result as any;
     if (bundle?.entry) {
       if (patientId) {
