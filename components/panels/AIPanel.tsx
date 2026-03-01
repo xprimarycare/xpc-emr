@@ -173,25 +173,18 @@ export function AIPanel() {
         <div className="flex items-center justify-between px-4 pb-4">
           <div className="flex gap-1.5 flex-wrap">
             <button
-              onClick={() => handleSuggestionClick('What medications is this patient on?')}
+              onClick={() => handleSuggestionClick('Summarize this chart')}
               disabled={isLoading}
               className="px-3 py-1.5 bg-gray-100 border border-gray-200 rounded-full text-xs text-gray-600 hover:bg-gray-200 transition-colors disabled:opacity-50"
             >
-              Medications
+              Summarize this chart
             </button>
             <button
-              onClick={() => handleSuggestionClick('Summarize recent visits')}
+              onClick={() => handleSuggestionClick('Highest BP?')}
               disabled={isLoading}
               className="px-3 py-1.5 bg-gray-100 border border-gray-200 rounded-full text-xs text-gray-600 hover:bg-gray-200 transition-colors disabled:opacity-50"
             >
-              Visits
-            </button>
-            <button
-              onClick={() => handleSuggestionClick('What are the care gaps?')}
-              disabled={isLoading}
-              className="px-3 py-1.5 bg-gray-100 border border-gray-200 rounded-full text-xs text-gray-600 hover:bg-gray-200 transition-colors disabled:opacity-50"
-            >
-              Care gaps
+              Highest BP?
             </button>
           </div>
           <button
