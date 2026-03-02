@@ -16,7 +16,7 @@ interface AIMessage {
 function getWelcomeMessage(): AIMessage {
   return {
     type: 'response',
-    content: `Welcome! I can help you query information from this patient's record. Try asking about:\n\n• Current medications\n• Recent visit summaries\n• Care gaps and screenings due\n• Lab results and trends`,
+    content: `Welcome! Ask me any question about this patient's chart.`,
     time: new Date(),
   };
 }
