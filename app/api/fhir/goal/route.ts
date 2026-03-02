@@ -1,8 +1,12 @@
 import { phenomlClient } from "@/lib/phenoml/client";
 import { NextRequest, NextResponse } from "next/server";
+import { requireAuth, isSession } from "@/lib/auth-helpers";
 
 // GET /api/fhir/goal?patient={fhirId} - Search patient's goals
 export async function GET(request: NextRequest) {
+  const authResult = await requireAuth()
+  if (!isSession(authResult)) return authResult
+
   try {
     const searchParams = request.nextUrl.searchParams;
     const patientFhirId = searchParams.get("patient");
@@ -42,6 +46,9 @@ export async function GET(request: NextRequest) {
 
 // PUT /api/fhir/goal - Upsert a Goal in Medplum
 export async function PUT(request: NextRequest) {
+  const authResult = await requireAuth()
+  if (!isSession(authResult)) return authResult
+
   try {
     const providerId = process.env.PHENOML_FHIR_PROVIDER_ID;
     if (!providerId) {
@@ -84,6 +91,9 @@ export async function PUT(request: NextRequest) {
 
 // DELETE /api/fhir/goal?id={goalId} - Delete a Goal from Medplum
 export async function DELETE(request: NextRequest) {
+  const authResult = await requireAuth()
+  if (!isSession(authResult)) return authResult
+
   try {
     const providerId = process.env.PHENOML_FHIR_PROVIDER_ID;
     if (!providerId) {
@@ -118,6 +128,9 @@ export async function DELETE(request: NextRequest) {
 
 // POST /api/fhir/goal - Create a new Goal in Medplum
 export async function POST(request: NextRequest) {
+  const authResult = await requireAuth()
+  if (!isSession(authResult)) return authResult
+
   try {
     const providerId = process.env.PHENOML_FHIR_PROVIDER_ID;
     if (!providerId) {

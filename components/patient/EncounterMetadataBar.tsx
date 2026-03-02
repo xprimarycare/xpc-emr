@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { Mic } from 'lucide-react';
+import { useAuth } from '@/lib/context/AuthContext';
 import { usePatient } from '@/lib/context/PatientContext';
 import { useEditor } from '@/lib/context/EditorContext';
 import { AppEncounter, ENCOUNTER_CLASS_OPTIONS } from '@/lib/types/encounter';
@@ -15,6 +16,7 @@ import { useWhisper } from '@/lib/hooks/useWhisper';
 type SaveStatus = 'idle' | 'saving' | 'success' | 'error';
 
 export function EncounterMetadataBar() {
+  const { user } = useAuth();
   const { activePatient, updateTabProperties } = usePatient();
   const { activeTabId, tabContent } = useEditor();
 
@@ -136,7 +138,7 @@ export function EncounterMetadataBar() {
       patientName: activePatient?.name || '',
       patientDob: activePatient?.dob || '',
       encounterDate,
-      providerName: process.env.NEXT_PUBLIC_PRACTITIONER_NAME || '',
+      providerName: user?.name || '',
     });
     setRightPanelType('chartReview');
   };

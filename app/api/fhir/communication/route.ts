@@ -1,9 +1,13 @@
 import { phenomlClient } from "@/lib/phenoml/client";
 import { NextRequest, NextResponse } from "next/server";
+import { requireAuth, isSession } from "@/lib/auth-helpers";
 
 // GET /api/fhir/communication?patient={fhirId} - Search patient's messages
 // Optional: &thread={threadId} to get messages in a specific thread
 export async function GET(request: NextRequest) {
+  const authResult = await requireAuth()
+  if (!isSession(authResult)) return authResult
+
   try {
     const searchParams = request.nextUrl.searchParams;
     const patientFhirId = searchParams.get("patient");
@@ -63,6 +67,9 @@ export async function GET(request: NextRequest) {
 
 // POST /api/fhir/communication - Create a new Communication
 export async function POST(request: NextRequest) {
+  const authResult = await requireAuth()
+  if (!isSession(authResult)) return authResult
+
   try {
     const providerId = process.env.PHENOML_FHIR_PROVIDER_ID;
     if (!providerId) {

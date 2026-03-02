@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requireAuth, isSession } from "@/lib/auth-helpers";
 
 // POST /api/chart-review — Proxy to XPC Chart Review API
 export async function POST(request: NextRequest) {
+  const authResult = await requireAuth()
+  if (!isSession(authResult)) return authResult
+
   const requestId = crypto.randomUUID().slice(0, 8);
   const log = (level: "log" | "warn" | "error", ...args: unknown[]) =>
     console[level](`[chart-review][${requestId}]`, ...args);

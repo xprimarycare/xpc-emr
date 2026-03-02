@@ -1,9 +1,13 @@
 import { phenomlClient } from "@/lib/phenoml/client";
 import { NextRequest, NextResponse } from "next/server";
+import { requireAuth, isSession } from "@/lib/auth-helpers";
 
 // GET /api/fhir/patient - Search patients
 // GET /api/fhir/patient?id=123 - Get specific patient
 export async function GET(request: NextRequest) {
+  const authResult = await requireAuth()
+  if (!isSession(authResult)) return authResult
+
   try {
     const searchParams = request.nextUrl.searchParams;
     const patientId = searchParams.get("id");
@@ -77,6 +81,9 @@ export async function GET(request: NextRequest) {
 
 // POST /api/fhir/patient - Create a new patient in Medplum via FHIR create
 export async function POST(request: NextRequest) {
+  const authResult = await requireAuth()
+  if (!isSession(authResult)) return authResult
+
   try {
     const providerId = process.env.PHENOML_FHIR_PROVIDER_ID;
     if (!providerId) {
@@ -137,6 +144,9 @@ export async function POST(request: NextRequest) {
 
 // PUT /api/fhir/patient - Upsert (create or update) a patient in Medplum
 export async function PUT(request: NextRequest) {
+  const authResult = await requireAuth()
+  if (!isSession(authResult)) return authResult
+
   try {
     const providerId = process.env.PHENOML_FHIR_PROVIDER_ID;
     if (!providerId) {

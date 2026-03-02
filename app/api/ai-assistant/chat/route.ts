@@ -38,6 +38,7 @@ import type { AppCareTeamMember } from "@/lib/types/care-team";
 import type { AppGoal } from "@/lib/types/goal";
 import type { AppReferral } from "@/lib/types/referral";
 import type { AIAssistantMessage } from "@/lib/types/ai-assistant";
+import { requireAuth, isSession } from "@/lib/auth-helpers";
 
 // --- In-Memory Patient Context Cache ---
 
@@ -439,6 +440,9 @@ function buildSystemPrompt(ctx: CachedPatientContext): string {
 // --- POST Handler ---
 
 export async function POST(request: NextRequest) {
+  const authResult = await requireAuth()
+  if (!isSession(authResult)) return authResult
+
   const requestId = crypto.randomUUID().slice(0, 8);
   const log = (level: "log" | "warn" | "error", ...args: unknown[]) =>
     console[level](`[ai-assistant][${requestId}]`, ...args);

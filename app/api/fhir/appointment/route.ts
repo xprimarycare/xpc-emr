@@ -1,8 +1,12 @@
 import { phenomlClient } from "@/lib/phenoml/client";
 import { NextRequest, NextResponse } from "next/server";
+import { requireAuth, isSession } from "@/lib/auth-helpers";
 
 // GET /api/fhir/appointment?date=ge{start}&date=le{end} or ?patient={fhirId}
 export async function GET(request: NextRequest) {
+  const authResult = await requireAuth()
+  if (!isSession(authResult)) return authResult
+
   try {
     const searchParams = request.nextUrl.searchParams;
     const dateParams = searchParams.getAll("date");
@@ -49,6 +53,9 @@ export async function GET(request: NextRequest) {
 
 // POST /api/fhir/appointment - Create a new Appointment
 export async function POST(request: NextRequest) {
+  const authResult = await requireAuth()
+  if (!isSession(authResult)) return authResult
+
   try {
     const providerId = process.env.PHENOML_FHIR_PROVIDER_ID;
     if (!providerId) {
@@ -85,6 +92,9 @@ export async function POST(request: NextRequest) {
 
 // PUT /api/fhir/appointment - Update an existing Appointment
 export async function PUT(request: NextRequest) {
+  const authResult = await requireAuth()
+  if (!isSession(authResult)) return authResult
+
   try {
     const providerId = process.env.PHENOML_FHIR_PROVIDER_ID;
     if (!providerId) {
@@ -127,6 +137,9 @@ export async function PUT(request: NextRequest) {
 
 // DELETE /api/fhir/appointment?id={appointmentFhirId}
 export async function DELETE(request: NextRequest) {
+  const authResult = await requireAuth()
+  if (!isSession(authResult)) return authResult
+
   try {
     const searchParams = request.nextUrl.searchParams;
     const appointmentId = searchParams.get("id");
