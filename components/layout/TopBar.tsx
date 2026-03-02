@@ -1,7 +1,9 @@
 'use client';
 
 import React from 'react';
+import Link from 'next/link';
 import { Menu, Users, Plus, Lightbulb, MessageCircle, Calendar, Columns } from 'lucide-react';
+import { useAuth } from '@/lib/context/AuthContext';
 import { usePatient } from '@/lib/context/PatientContext';
 import { useSidebar } from '@/lib/context/SidebarContext';
 import { useEditor } from '@/lib/context/EditorContext';
@@ -10,6 +12,7 @@ import { PatientSearch } from '@/components/patient/PatientSearch';
 import { createDefaultTabs } from '@/lib/data/default-tabs';
 
 export function TopBar() {
+  const { user } = useAuth();
   const { addPatient } = usePatient();
   const { toggleRightPanel } = useSidebar();
   const { toggleLeftPanel } = useEditor();
@@ -87,6 +90,28 @@ export function TopBar() {
           >
             <Columns size={20} className="text-gray-600" />
           </button>
+          <Link
+            href="/account"
+            className="flex items-center gap-2 pl-2 border-l border-gray-200 hover:opacity-80 transition-opacity"
+          >
+            {user?.image ? (
+              <img
+                src={user.image}
+                alt={user.name || ''}
+                referrerPolicy="no-referrer"
+                className="w-7 h-7 rounded-full"
+              />
+            ) : (
+              <div className="w-7 h-7 rounded-full bg-gray-200 flex items-center justify-center">
+                <span className="text-xs font-medium text-gray-600">
+                  {user?.name?.[0] || '?'}
+                </span>
+              </div>
+            )}
+            <span className="text-sm text-gray-700 hidden md:inline">
+              {user?.name || 'Unknown'}
+            </span>
+          </Link>
         </div>
       </div>
     </div>
