@@ -2,6 +2,7 @@
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Send, Mic, Paperclip, Clock, Phone, Video, Loader2 } from 'lucide-react';
+import { useAuth } from '@/lib/context/AuthContext';
 import { usePatient } from '@/lib/context/PatientContext';
 import { AppMessage } from '@/lib/types/message';
 import { searchFhirThreads, sendFhirMessage } from '@/lib/services/fhir-communication-service';
@@ -10,9 +11,10 @@ import { useWhisper } from '@/lib/hooks/useWhisper';
 const POLL_INTERVAL_MS = 15_000;
 
 export function ChatPanel() {
+  const { user } = useAuth();
   const { activePatient } = usePatient();
   const isFhirPatient = !!activePatient?.fhirId;
-  const practitionerId = process.env.NEXT_PUBLIC_FHIR_PRACTITIONER_ID || '';
+  const practitionerId = (user as Record<string, unknown>)?.fhirPractitionerId as string || '';
 
   const [messages, setMessages] = useState<AppMessage[]>([]);
   const [threadId, setThreadId] = useState<string | null>(null);

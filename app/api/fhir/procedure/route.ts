@@ -1,8 +1,12 @@
 import { phenomlClient } from "@/lib/phenoml/client";
 import { NextRequest, NextResponse } from "next/server";
+import { requireAuth, isSession } from "@/lib/auth-helpers";
 
 // GET /api/fhir/procedure?patient={fhirId} - Search patient's procedures
 export async function GET(request: NextRequest) {
+  const authResult = await requireAuth()
+  if (!isSession(authResult)) return authResult
+
   try {
     const searchParams = request.nextUrl.searchParams;
     const patientFhirId = searchParams.get("patient");
@@ -42,6 +46,9 @@ export async function GET(request: NextRequest) {
 
 // PUT /api/fhir/procedure - Upsert a Procedure in Medplum
 export async function PUT(request: NextRequest) {
+  const authResult = await requireAuth()
+  if (!isSession(authResult)) return authResult
+
   try {
     const providerId = process.env.PHENOML_FHIR_PROVIDER_ID;
     if (!providerId) {
@@ -84,6 +91,9 @@ export async function PUT(request: NextRequest) {
 
 // DELETE /api/fhir/procedure?id={procedureId} - Delete a Procedure from Medplum
 export async function DELETE(request: NextRequest) {
+  const authResult = await requireAuth()
+  if (!isSession(authResult)) return authResult
+
   try {
     const providerId = process.env.PHENOML_FHIR_PROVIDER_ID;
     if (!providerId) {
@@ -118,6 +128,9 @@ export async function DELETE(request: NextRequest) {
 
 // POST /api/fhir/procedure - Create a new Procedure in Medplum
 export async function POST(request: NextRequest) {
+  const authResult = await requireAuth()
+  if (!isSession(authResult)) return authResult
+
   try {
     const providerId = process.env.PHENOML_FHIR_PROVIDER_ID;
     if (!providerId) {

@@ -1,8 +1,12 @@
 import { phenomlClient } from "@/lib/phenoml/client";
 import { NextRequest, NextResponse } from "next/server";
+import { requireAuth, isSession } from "@/lib/auth-helpers";
 
 // GET /api/fhir/construe/semantic?codesystem=LOINC&text=chest+x-ray&limit=10
 export async function GET(request: NextRequest) {
+  const authResult = await requireAuth()
+  if (!isSession(authResult)) return authResult
+
   try {
     const { searchParams } = new URL(request.url);
     const codesystem = searchParams.get("codesystem") || "LOINC";

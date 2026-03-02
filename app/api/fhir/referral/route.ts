@@ -1,8 +1,12 @@
 import { phenomlClient } from "@/lib/phenoml/client";
 import { NextRequest, NextResponse } from "next/server";
+import { requireAuth, isSession } from "@/lib/auth-helpers";
 
 // GET /api/fhir/referral?patient={fhirId} - Search patient's referrals
 export async function GET(request: NextRequest) {
+  const authResult = await requireAuth()
+  if (!isSession(authResult)) return authResult
+
   try {
     const searchParams = request.nextUrl.searchParams;
     const patientFhirId = searchParams.get("patient");
@@ -48,6 +52,9 @@ export async function GET(request: NextRequest) {
 
 // PUT /api/fhir/referral - Upsert an existing referral ServiceRequest
 export async function PUT(request: NextRequest) {
+  const authResult = await requireAuth()
+  if (!isSession(authResult)) return authResult
+
   try {
     const providerId = process.env.PHENOML_FHIR_PROVIDER_ID;
     if (!providerId) {
@@ -90,6 +97,9 @@ export async function PUT(request: NextRequest) {
 
 // POST /api/fhir/referral - Create a new referral ServiceRequest
 export async function POST(request: NextRequest) {
+  const authResult = await requireAuth()
+  if (!isSession(authResult)) return authResult
+
   try {
     const providerId = process.env.PHENOML_FHIR_PROVIDER_ID;
     if (!providerId) {

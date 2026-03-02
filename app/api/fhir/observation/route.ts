@@ -1,8 +1,12 @@
 import { phenomlClient } from "@/lib/phenoml/client";
 import { NextRequest, NextResponse } from "next/server";
+import { requireAuth, isSession } from "@/lib/auth-helpers";
 
 // GET /api/fhir/observation?patient={fhirId} - Search patient's vital-signs observations
 export async function GET(request: NextRequest) {
+  const authResult = await requireAuth()
+  if (!isSession(authResult)) return authResult
+
   try {
     const searchParams = request.nextUrl.searchParams;
     const patientFhirId = searchParams.get("patient");
@@ -50,6 +54,9 @@ export async function GET(request: NextRequest) {
 
 // POST /api/fhir/observation - Create a new Observation
 export async function POST(request: NextRequest) {
+  const authResult = await requireAuth()
+  if (!isSession(authResult)) return authResult
+
   try {
     const providerId = process.env.PHENOML_FHIR_PROVIDER_ID;
     if (!providerId) {
@@ -86,6 +93,9 @@ export async function POST(request: NextRequest) {
 
 // PUT /api/fhir/observation - Upsert an Observation
 export async function PUT(request: NextRequest) {
+  const authResult = await requireAuth()
+  if (!isSession(authResult)) return authResult
+
   try {
     const providerId = process.env.PHENOML_FHIR_PROVIDER_ID;
     if (!providerId) {
