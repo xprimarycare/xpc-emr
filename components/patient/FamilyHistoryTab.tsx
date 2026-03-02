@@ -21,7 +21,7 @@ const RELATIONSHIP_OPTIONS = Object.entries(RELATIONSHIP_KEYWORDS)
   .map(([, val]) => val)
   .filter((v, i, arr) => arr.findIndex((x) => x.code === v.code) === i);
 
-export function FamilyHistoryTab() {
+export function FamilyHistoryTab({ refreshKey }: { refreshKey?: number }) {
   const { activePatient } = usePatient();
   const isFhirPatient = !!activePatient?.fhirId;
   const editorRef = useRef<HTMLDivElement>(null);
@@ -66,7 +66,7 @@ export function FamilyHistoryTab() {
       }
     });
     return () => { cancelled = true; };
-  }, [activePatient?.fhirId, isFhirPatient]);
+  }, [activePatient?.fhirId, isFhirPatient, refreshKey]);
 
   // --- Accordion ---
 

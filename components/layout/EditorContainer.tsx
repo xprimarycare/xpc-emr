@@ -62,25 +62,26 @@ export function EditorContainer() {
   const [imagingCounts, setImagingCounts] = useState({ pending: 0, results: 0 });
   const [referralView, setReferralView] = useState<'pending' | 'completed'>('pending');
   const [referralCounts, setReferralCounts] = useState({ pending: 0, completed: 0 });
+  const [refreshKey, setRefreshKey] = useState(0);
 
   // Determine which structured component to render in the top panel
   const structuredContent = useMemo(() => {
     if (isPatientInfoTab) return <PatientInfoTab />;
-    if (isMedicationsTab) return <MedicationsTab />;
-    if (isAllergiesTab) return <AllergiesTab />;
-    if (isLabsTab) return <LabsTab labView={labView} onCountsChange={(pending, results) => setLabCounts({ pending, results })} />;
-    if (isImagingTab) return <ImagingTab imagingView={imagingView} onCountsChange={(pending, results) => setImagingCounts({ pending, results })} />;
-    if (isMedicalHistoryTab) return <MedicalHistoryTab />;
-    if (isVitalsTab) return <VitalsTab />;
-    if (isSurgicalHistoryTab) return <SurgicalHistoryTab />;
-    if (isFamilyHistoryTab) return <FamilyHistoryTab />;
-    if (isSocialHistoryTab) return <SocialHistoryTab />;
-    if (isGoalsOfCareTab) return <GoalsOfCareTab />;
-    if (isCareTeamTab) return <CareTeamTab />;
-    if (isReferralsTab) return <ReferralsTab referralView={referralView} onCountsChange={(pending, completed) => setReferralCounts({ pending, completed })} />;
+    if (isMedicationsTab) return <MedicationsTab refreshKey={refreshKey} />;
+    if (isAllergiesTab) return <AllergiesTab refreshKey={refreshKey} />;
+    if (isLabsTab) return <LabsTab labView={labView} onCountsChange={(pending, results) => setLabCounts({ pending, results })} refreshKey={refreshKey} />;
+    if (isImagingTab) return <ImagingTab imagingView={imagingView} onCountsChange={(pending, results) => setImagingCounts({ pending, results })} refreshKey={refreshKey} />;
+    if (isMedicalHistoryTab) return <MedicalHistoryTab refreshKey={refreshKey} />;
+    if (isVitalsTab) return <VitalsTab refreshKey={refreshKey} />;
+    if (isSurgicalHistoryTab) return <SurgicalHistoryTab refreshKey={refreshKey} />;
+    if (isFamilyHistoryTab) return <FamilyHistoryTab refreshKey={refreshKey} />;
+    if (isSocialHistoryTab) return <SocialHistoryTab refreshKey={refreshKey} />;
+    if (isGoalsOfCareTab) return <GoalsOfCareTab refreshKey={refreshKey} />;
+    if (isCareTeamTab) return <CareTeamTab refreshKey={refreshKey} />;
+    if (isReferralsTab) return <ReferralsTab referralView={referralView} onCountsChange={(pending, completed) => setReferralCounts({ pending, completed })} refreshKey={refreshKey} />;
     // Encounters, tasks, and generic pages have no structured content yet
     return <StructuredPlaceholder />;
-  }, [isPatientInfoTab, isMedicationsTab, isAllergiesTab, isLabsTab, labView, isImagingTab, imagingView, isMedicalHistoryTab, isVitalsTab, isSurgicalHistoryTab, isFamilyHistoryTab, isSocialHistoryTab, isGoalsOfCareTab, isCareTeamTab, isReferralsTab, referralView]);
+  }, [isPatientInfoTab, isMedicationsTab, isAllergiesTab, isLabsTab, labView, isImagingTab, imagingView, isMedicalHistoryTab, isVitalsTab, isSurgicalHistoryTab, isFamilyHistoryTab, isSocialHistoryTab, isGoalsOfCareTab, isCareTeamTab, isReferralsTab, referralView, refreshKey]);
 
   // Determine placeholder text for the note editor
   const editorPlaceholder = isEncounterTab
@@ -137,6 +138,7 @@ export function EditorContainer() {
         <PageMetadataBar
           showNote={showNote}
           onToggleNote={() => setShowNote(v => !v)}
+          onRefresh={() => setRefreshKey(k => k + 1)}
           {...(isLabsTab ? { labView, onLabViewChange: setLabView, labCounts } : {})}
           {...(isImagingTab ? { imagingView, onImagingViewChange: setImagingView, imagingCounts } : {})}
           {...(isReferralsTab ? { referralView, onReferralViewChange: setReferralView, referralCounts } : {})}

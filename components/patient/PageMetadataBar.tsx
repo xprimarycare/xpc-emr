@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useCallback } from 'react';
-import { Mic } from 'lucide-react';
+import { Mic, RefreshCw } from 'lucide-react';
 import { usePatient } from '@/lib/context/PatientContext';
 import { useEditor } from '@/lib/context/EditorContext';
 import { useWhisper } from '@/lib/hooks/useWhisper';
@@ -20,9 +20,10 @@ interface PageMetadataBarProps {
   referralView?: 'pending' | 'completed';
   onReferralViewChange?: (view: 'pending' | 'completed') => void;
   referralCounts?: { pending: number; completed: number };
+  onRefresh?: () => void;
 }
 
-export function PageMetadataBar({ showNote, onToggleNote, labView, onLabViewChange, labCounts, imagingView, onImagingViewChange, imagingCounts, referralView, onReferralViewChange, referralCounts }: PageMetadataBarProps) {
+export function PageMetadataBar({ showNote, onToggleNote, labView, onLabViewChange, labCounts, imagingView, onImagingViewChange, imagingCounts, referralView, onReferralViewChange, referralCounts, onRefresh }: PageMetadataBarProps) {
   const { activePatient } = usePatient();
   const { activeTabId, tabContent } = useEditor();
   const activeTab = activePatient?.tabs.find(t => t.id === activeTabId);
@@ -62,6 +63,16 @@ export function PageMetadataBar({ showNote, onToggleNote, labView, onLabViewChan
       <span className="text-sm font-medium text-gray-600">
         {activeTab?.name || 'Page'}
       </span>
+
+      {onRefresh && (
+        <button
+          onClick={onRefresh}
+          className="p-1 rounded hover:bg-gray-200 transition-colors text-gray-400 hover:text-gray-600"
+          title="Refresh data"
+        >
+          <RefreshCw size={14} />
+        </button>
+      )}
 
       {labView && onLabViewChange && (
         <div className="bg-gray-200 rounded-lg p-0.5 flex">

@@ -10,7 +10,7 @@ import {
 
 type SaveStatus = 'idle' | 'loading' | 'saving' | 'success' | 'error';
 
-export function MedicationsTab() {
+export function MedicationsTab({ refreshKey }: { refreshKey?: number }) {
   const { activePatient } = usePatient();
   const isFhirPatient = !!activePatient?.fhirId;
 
@@ -42,7 +42,7 @@ export function MedicationsTab() {
       }
     });
     return () => { cancelled = true; };
-  }, [activePatient?.fhirId, isFhirPatient]);
+  }, [activePatient?.fhirId, isFhirPatient, refreshKey]);
 
   const handleEdit = (med: AppMedication) => {
     setEditingId(med.id);

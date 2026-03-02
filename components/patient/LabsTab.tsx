@@ -13,9 +13,10 @@ type SaveStatus = 'idle' | 'loading' | 'saving' | 'success' | 'error';
 interface LabsTabProps {
   labView?: 'pending' | 'results';
   onCountsChange?: (pending: number, results: number) => void;
+  refreshKey?: number;
 }
 
-export function LabsTab({ labView = 'pending', onCountsChange }: LabsTabProps) {
+export function LabsTab({ labView = 'pending', onCountsChange, refreshKey }: LabsTabProps) {
   const { activePatient } = usePatient();
   const isFhirPatient = !!activePatient?.fhirId;
 
@@ -47,7 +48,7 @@ export function LabsTab({ labView = 'pending', onCountsChange }: LabsTabProps) {
       }
     });
     return () => { cancelled = true; };
-  }, [activePatient?.fhirId, isFhirPatient]);
+  }, [activePatient?.fhirId, isFhirPatient, refreshKey]);
 
   // Filter by view and report counts
   const pendingOrders = useMemo(() => labOrders.filter(l => l.status === 'draft' || l.status === 'active'), [labOrders]);

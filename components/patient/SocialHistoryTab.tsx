@@ -15,7 +15,7 @@ import {
 type SaveStatus = 'idle' | 'loading' | 'saving' | 'success' | 'error';
 type SyncStatus = 'idle' | 'resolving' | 'preview' | 'syncing' | 'success' | 'error';
 
-export function SocialHistoryTab() {
+export function SocialHistoryTab({ refreshKey }: { refreshKey?: number }) {
   const { activePatient } = usePatient();
   const isFhirPatient = !!activePatient?.fhirId;
   const editorRef = useRef<HTMLDivElement>(null);
@@ -53,7 +53,7 @@ export function SocialHistoryTab() {
       }
     });
     return () => { cancelled = true; };
-  }, [activePatient?.fhirId, isFhirPatient]);
+  }, [activePatient?.fhirId, isFhirPatient, refreshKey]);
 
   const handleEdit = (obs: AppSocialHistoryObservation) => {
     setEditingId(obs.id);

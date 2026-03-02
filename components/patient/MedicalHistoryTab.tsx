@@ -15,7 +15,7 @@ import {
 type SaveStatus = 'idle' | 'loading' | 'saving' | 'success' | 'error';
 type SyncStatus = 'idle' | 'resolving' | 'syncing' | 'success' | 'error';
 
-export function MedicalHistoryTab() {
+export function MedicalHistoryTab({ refreshKey }: { refreshKey?: number }) {
   const { activePatient } = usePatient();
   const isFhirPatient = !!activePatient?.fhirId;
   const editorRef = useRef<HTMLDivElement>(null);
@@ -53,7 +53,7 @@ export function MedicalHistoryTab() {
       }
     });
     return () => { cancelled = true; };
-  }, [activePatient?.fhirId, isFhirPatient]);
+  }, [activePatient?.fhirId, isFhirPatient, refreshKey]);
 
   const handleEdit = (condition: AppCondition) => {
     setEditingId(condition.id);
