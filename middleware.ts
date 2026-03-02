@@ -36,8 +36,15 @@ export default auth((req) => {
   if (
     !user?.onboardingComplete &&
     !pathname.startsWith("/onboarding") &&
-    !pathname.startsWith("/api/")
+    !pathname.startsWith("/api/auth") &&
+    !pathname.startsWith("/api/user/onboarding")
   ) {
+    if (pathname.startsWith("/api/")) {
+      return NextResponse.json(
+        { error: "Onboarding not complete" },
+        { status: 403 }
+      )
+    }
     return NextResponse.redirect(new URL("/onboarding", req.url))
   }
 

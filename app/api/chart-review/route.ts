@@ -119,12 +119,7 @@ export async function POST(request: NextRequest) {
       stack: error instanceof Error ? error.stack : undefined,
     });
     return NextResponse.json(
-      {
-        error:
-          error instanceof Error
-            ? error.message
-            : "Failed to reach chart review API",
-      },
+      { error: "An unexpected error occurred" },
       { status: 500 }
     );
   }

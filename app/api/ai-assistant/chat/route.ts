@@ -65,7 +65,26 @@ interface CachedPatientContext {
 }
 
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+const MAX_CACHE_SIZE = 100;
 const patientContextCache = new Map<string, CachedPatientContext>();
+
+function evictStaleEntries() {
+  const now = Date.now();
+  for (const [key, entry] of patientContextCache) {
+    if (now - entry.fetchedAt >= CACHE_TTL_MS) {
+      patientContextCache.delete(key);
+    }
+  }
+  // If still over limit, evict oldest entries
+  if (patientContextCache.size > MAX_CACHE_SIZE) {
+    const entries = [...patientContextCache.entries()]
+      .sort((a, b) => a[1].fetchedAt - b[1].fetchedAt);
+    const toRemove = entries.slice(0, entries.length - MAX_CACHE_SIZE);
+    for (const [key] of toRemove) {
+      patientContextCache.delete(key);
+    }
+  }
+}
 
 // --- FHIR Data Aggregation ---
 
@@ -198,6 +217,7 @@ async function getPatientContext(
   });
 
   patientContextCache.set(cacheKey, context);
+  evictStaleEntries();
   return context;
 }
 
@@ -541,7 +561,7 @@ export async function POST(request: NextRequest) {
       stack: error instanceof Error ? error.stack : undefined,
     });
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "AI assistant request failed" },
+      { error: "An unexpected error occurred" },
       { status: 500 }
     );
   }
