@@ -13,9 +13,10 @@ type SaveStatus = 'idle' | 'loading' | 'saving' | 'success' | 'error';
 interface ImagingTabProps {
   imagingView?: 'pending' | 'results';
   onCountsChange?: (pending: number, results: number) => void;
+  refreshKey?: number;
 }
 
-export function ImagingTab({ imagingView = 'pending', onCountsChange }: ImagingTabProps) {
+export function ImagingTab({ imagingView = 'pending', onCountsChange, refreshKey }: ImagingTabProps) {
   const { activePatient } = usePatient();
   const isFhirPatient = !!activePatient?.fhirId;
 
@@ -47,7 +48,7 @@ export function ImagingTab({ imagingView = 'pending', onCountsChange }: ImagingT
       }
     });
     return () => { cancelled = true; };
-  }, [activePatient?.fhirId, isFhirPatient]);
+  }, [activePatient?.fhirId, isFhirPatient, refreshKey]);
 
   // Filter by view and report counts
   const pendingOrders = useMemo(() => imagingOrders.filter(o => o.status === 'draft' || o.status === 'active'), [imagingOrders]);

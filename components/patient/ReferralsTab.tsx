@@ -13,9 +13,10 @@ type SaveStatus = 'idle' | 'loading' | 'saving' | 'success' | 'error';
 interface ReferralsTabProps {
   referralView?: 'pending' | 'completed';
   onCountsChange?: (pending: number, completed: number) => void;
+  refreshKey?: number;
 }
 
-export function ReferralsTab({ referralView = 'pending', onCountsChange }: ReferralsTabProps) {
+export function ReferralsTab({ referralView = 'pending', onCountsChange, refreshKey }: ReferralsTabProps) {
   const { activePatient } = usePatient();
   const isFhirPatient = !!activePatient?.fhirId;
 
@@ -47,7 +48,7 @@ export function ReferralsTab({ referralView = 'pending', onCountsChange }: Refer
       }
     });
     return () => { cancelled = true; };
-  }, [activePatient?.fhirId, isFhirPatient]);
+  }, [activePatient?.fhirId, isFhirPatient, refreshKey]);
 
   // Filter by view and report counts
   const pendingReferrals = useMemo(() => referrals.filter(r => r.status === 'draft' || r.status === 'active'), [referrals]);

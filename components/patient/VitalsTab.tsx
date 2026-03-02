@@ -86,7 +86,7 @@ function EncounterSelect({
   );
 }
 
-export function VitalsTab() {
+export function VitalsTab({ refreshKey }: { refreshKey?: number }) {
   const { activePatient } = usePatient();
   const isFhirPatient = !!activePatient?.fhirId;
 
@@ -138,7 +138,7 @@ export function VitalsTab() {
       }
     });
     return () => { cancelled = true; };
-  }, [activePatient?.fhirId, isFhirPatient]);
+  }, [activePatient?.fhirId, isFhirPatient, refreshKey]);
 
   /** Look up encounter display label by FHIR ID */
   const getEncounterLabel = (encounterFhirId: string): string | null => {
