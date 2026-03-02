@@ -170,9 +170,11 @@ async function fetchPatientContext(
 async function getPatientContext(
   patientFhirId: string,
   providerId: string,
+  userId: string,
   log: (level: "log" | "warn" | "error", ...args: unknown[]) => void
 ): Promise<CachedPatientContext> {
-  const cached = patientContextCache.get(patientFhirId);
+  const cacheKey = `${userId}:${patientFhirId}`;
+  const cached = patientContextCache.get(cacheKey);
   if (cached && Date.now() - cached.fetchedAt < CACHE_TTL_MS) {
     log("log", "Using cached patient context", {
       patientFhirId,
@@ -195,7 +197,7 @@ async function getPatientContext(
     errors: context.errors,
   });
 
-  patientContextCache.set(patientFhirId, context);
+  patientContextCache.set(cacheKey, context);
   return context;
 }
 
@@ -489,7 +491,7 @@ export async function POST(request: NextRequest) {
     });
 
     // 1. Get patient context (cached or fresh)
-    const patientContext = await getPatientContext(patientFhirId, providerId, log);
+    const patientContext = await getPatientContext(patientFhirId, providerId, authResult.user.id, log);
 
     // 2. Build system prompt
     const systemPrompt = buildSystemPrompt(patientContext);

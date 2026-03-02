@@ -26,6 +26,11 @@ export async function POST(request: NextRequest) {
     })
 
     // Build a fresh JWT with the updated user data
+    const maxAge = 30 * 24 * 60 * 60 // 30 days — match Auth.js default
+    const cookieName = useSecureCookies()
+      ? "__Secure-authjs.session-token"
+      : "authjs.session-token"
+
     const newToken = await encode({
       token: {
         name: session.user.name,
@@ -39,14 +44,9 @@ export async function POST(request: NextRequest) {
         onboardingComplete: true,
       },
       secret: process.env.AUTH_SECRET!,
-      salt: useSecureCookies()
-        ? "__Secure-authjs.session-token"
-        : "authjs.session-token",
+      salt: cookieName,
+      maxAge,
     })
-
-    const cookieName = useSecureCookies()
-      ? "__Secure-authjs.session-token"
-      : "authjs.session-token"
 
     const response = NextResponse.json({ success: true })
     response.cookies.set(cookieName, newToken, {
@@ -54,6 +54,7 @@ export async function POST(request: NextRequest) {
       secure: useSecureCookies(),
       sameSite: "lax",
       path: "/",
+      maxAge,
     })
 
     return response

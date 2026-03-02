@@ -6,7 +6,8 @@ import { useSearchParams } from 'next/navigation'
 
 export function LoginForm() {
   const searchParams = useSearchParams()
-  const callbackUrl = searchParams.get('callbackUrl') || '/'
+  const rawCallback = searchParams.get('callbackUrl') || '/'
+  const callbackUrl = rawCallback.startsWith('/') && !rawCallback.startsWith('//') ? rawCallback : '/'
   const error = searchParams.get('error')
 
   return (

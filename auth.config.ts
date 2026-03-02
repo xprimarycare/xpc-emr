@@ -19,19 +19,14 @@ export default {
     strategy: "jwt",
   },
   callbacks: {
-    async jwt({ token, user }) {
-      if (user) {
-        token.id = user.id
-        token.onboardingComplete =
-          (user as unknown as Record<string, unknown>).onboardingComplete ??
-          false
-      }
-      return token
-    },
-    async session({ session, token }) {
+    // Map custom JWT fields → session.user so the middleware can read them.
+    // No DB access — safe for Edge Runtime.
+    session({ session, token }) {
       session.user.id = token.id as string
-      ;(session.user as unknown as Record<string, unknown>).onboardingComplete =
-        token.onboardingComplete as boolean
+      session.user.institution = token.institution as string | null
+      session.user.npi = token.npi as string | null
+      session.user.fhirPractitionerId = token.fhirPractitionerId as string | null
+      session.user.onboardingComplete = token.onboardingComplete as boolean
       return session
     },
   },

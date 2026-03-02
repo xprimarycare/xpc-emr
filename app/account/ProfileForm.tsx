@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 
 interface ProfileFormProps {
@@ -9,6 +10,7 @@ interface ProfileFormProps {
 }
 
 export function ProfileForm({ institution: initialInstitution, npi: initialNpi }: ProfileFormProps) {
+  const router = useRouter()
   const [institution, setInstitution] = useState(initialInstitution || '')
   const [npi, setNpi] = useState(initialNpi || '')
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -37,6 +39,7 @@ export function ProfileForm({ institution: initialInstitution, npi: initialNpi }
       }
 
       setStatus('success')
+      router.refresh()
       setTimeout(() => setStatus('idle'), 2000)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong')
