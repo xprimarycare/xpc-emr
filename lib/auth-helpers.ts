@@ -23,5 +23,5 @@ export async function requireAuth(): Promise<Session | NextResponse> {
  * Type guard to check if requireAuth returned a session (not an error response).
  */
 export function isSession(result: Session | NextResponse): result is Session {
-  return "user" in result
+  return !(result instanceof NextResponse)
 }
