@@ -13,11 +13,14 @@ export async function GET() {
       )
     }
 
+    const isAdmin = session.user.role === "admin"
+
     const users = await prisma.user.findMany({
       where: { onboardingComplete: true },
       select: {
         id: true,
         name: true,
+        ...(isAdmin && { email: true, role: true }),
       },
       orderBy: { name: "asc" },
     })

@@ -44,12 +44,27 @@ export default async function AccountPage() {
                 {user.name || "Unknown"}
               </h1>
               <p className="text-sm text-gray-500">{user.email}</p>
+              <span className="inline-block mt-1 text-[11px] font-medium uppercase tracking-wide px-2 py-0.5 rounded bg-gray-100 text-gray-500">
+                {user.role === 'admin' ? 'Admin' : 'Clinician'}
+              </span>
             </div>
           </div>
 
           <hr className="border-gray-200" />
 
           <ProfileForm institution={user.institution} npi={user.npi} />
+
+          {user.role === "admin" && (
+            <>
+              <hr className="border-gray-200" />
+              <Link
+                href="/admin"
+                className="block text-sm text-blue-600 hover:text-blue-800 font-medium"
+              >
+                Team Management &rarr;
+              </Link>
+            </>
+          )}
 
           <hr className="border-gray-200" />
 
