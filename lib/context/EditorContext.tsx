@@ -3,7 +3,7 @@
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 import { TabSection } from '../types/tab';
 
-export type LeftPanelMode = 'sidebar' | 'patientList' | null;
+export type LeftPanelMode = 'sidebar' | 'patientList' | 'caseLibrary' | null;
 
 interface EditorContextType {
   activeTabId: string | null;
@@ -15,7 +15,7 @@ interface EditorContextType {
   tabContent: Record<string, string>;
   updateTabContent: (tabId: string, content: string) => void;
   leftPanelMode: LeftPanelMode;
-  toggleLeftPanel: (type: 'sidebar' | 'patientList') => void;
+  toggleLeftPanel: (type: 'sidebar' | 'patientList' | 'caseLibrary') => void;
   leftSidebarCollapsed: boolean;
 }
 
@@ -59,7 +59,7 @@ export function EditorProvider({ children }: { children: ReactNode }) {
     }));
   };
 
-  const toggleLeftPanel = (type: 'sidebar' | 'patientList') => {
+  const toggleLeftPanel = (type: 'sidebar' | 'patientList' | 'caseLibrary') => {
     setLeftPanelMode(prev => prev === type ? null : type);
   };
 

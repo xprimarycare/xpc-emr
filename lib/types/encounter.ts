@@ -25,6 +25,8 @@ export interface AppEncounter {
   signedAt?: string;
   /** Name of the clinician who signed */
   signedBy?: string;
+  /** Database user ID of the clinician who signed */
+  signedById?: string;
 }
 
 export const ENCOUNTER_CLASS_OPTIONS: Array<{
