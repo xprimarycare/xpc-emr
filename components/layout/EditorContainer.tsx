@@ -131,6 +131,7 @@ export function EditorContainer() {
           <NoteEditor
             placeholder={editorPlaceholder}
             onContentChange={(isEncounterTab || isTaskTab) ? handleContentChange : undefined}
+            readOnly={isEncounterTab && !!activeTab?.isSigned}
           />
         </div>
       ) : (

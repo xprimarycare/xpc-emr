@@ -8,11 +8,13 @@ import { VariableAutocomplete } from './VariableAutocomplete';
 interface NoteEditorProps {
   placeholder?: string;
   onContentChange?: (plainText: string) => void;
+  readOnly?: boolean;
 }
 
 export function NoteEditor({
   placeholder = 'Start typing your notes here...',
   onContentChange,
+  readOnly = false,
 }: NoteEditorProps) {
   const { activePatient, updatePatient } = usePatient();
   const { activeTabId, tabContent, updateTabContent } = useEditor();
@@ -140,9 +142,9 @@ export function NoteEditor({
     <div className="h-full relative overflow-y-auto">
       <div
         ref={editorRef}
-        contentEditable
-        onInput={handleInput}
-        className="min-h-full px-8 py-6 focus:outline-none text-gray-900"
+        contentEditable={!readOnly}
+        onInput={readOnly ? undefined : handleInput}
+        className={`min-h-full px-8 py-6 focus:outline-none text-gray-900 ${readOnly ? 'bg-gray-50 cursor-default' : ''}`}
         style={{ fontSize: '15px', lineHeight: '1.6' }}
         suppressContentEditableWarning
         data-placeholder={placeholder}

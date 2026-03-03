@@ -60,6 +60,8 @@ export function LeftSidebar() {
           visitDate: enc.date ? enc.date.split('T')[0] : undefined,
           encounterFhirId: enc.encounterFhirId,
           noteFhirId: enc.noteFhirId,
+          isSigned: enc.isSigned,
+          signedAt: enc.signedAt,
         }));
 
       if (newTabs.length > 0) {

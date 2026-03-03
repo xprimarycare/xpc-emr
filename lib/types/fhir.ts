@@ -176,6 +176,17 @@ export interface FhirFamilyMemberHistory {
 
 export type FhirFamilyMemberHistoryBundle = FhirBundle<FhirFamilyMemberHistory>;
 
+// Extension types
+
+export interface FhirExtension {
+  url: string;
+  valueBoolean?: boolean;
+  valueDateTime?: string;
+  valueString?: string;
+  valueReference?: FhirReference;
+  extension?: FhirExtension[];
+}
+
 // Encounter types
 
 export interface FhirCoding {
@@ -202,6 +213,7 @@ export interface FhirEncounter {
   period?: FhirPeriod;
   reasonCode?: FhirCodeableConcept[];
   serviceProvider?: FhirReference;
+  extension?: FhirExtension[];
 }
 
 export type FhirEncounterBundle = FhirBundle<FhirEncounter>;
