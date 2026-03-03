@@ -18,6 +18,7 @@ interface UserRow {
   email: string;
   institution: string | null;
   patientCount: number;
+  noteCount: number;
 }
 
 interface PatientRow {
@@ -45,7 +46,7 @@ interface ActivityRow {
 }
 
 export function CaseLibraryPanel() {
-  const { leftPanelMode, toggleLeftPanel } = useEditor();
+  const { leftPanelMode, toggleLeftPanel, setActiveTabId } = useEditor();
   const { user } = useAuth();
   const { addPatient, setActivePatientId, patients } = usePatient();
 
@@ -141,10 +142,13 @@ export function CaseLibraryPanel() {
   const formatDate = (iso?: string) => {
     if (!iso) return '';
     try {
-      return new Date(iso).toLocaleDateString('en-US', {
+      return new Date(iso).toLocaleString('en-US', {
         month: 'short',
         day: 'numeric',
         year: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+        timeZone: 'America/New_York',
       });
     } catch {
       return iso;
@@ -183,11 +187,16 @@ export function CaseLibraryPanel() {
     }
   };
 
-  const handleEncounterClick = async (patientFhirId: string) => {
+  const handleEncounterClick = async (patientFhirId: string, encounterFhirId?: string) => {
     // Check if patient is already open
     const existing = patients.find((p) => p.fhirId === patientFhirId);
     if (existing) {
       setActivePatientId(existing.id);
+      // Navigate to the specific encounter tab if provided
+      if (encounterFhirId) {
+        const tab = existing.tabs.find((t) => t.encounterFhirId === encounterFhirId);
+        if (tab) setActiveTabId(tab.id);
+      }
     } else {
       // Fetch patient and open them
       try {
@@ -203,6 +212,14 @@ export function CaseLibraryPanel() {
             fhirId: patientFhirId,
             tabs: [],
           });
+          // Once tabs load, navigate to the encounter tab
+          if (encounterFhirId) {
+            setTimeout(() => {
+              const patient = patients.find((p) => p.fhirId === patientFhirId);
+              const tab = patient?.tabs.find((t) => t.encounterFhirId === encounterFhirId);
+              if (tab) setActiveTabId(tab.id);
+            }, 500);
+          }
         }
       } catch {
         // Fallback: still try to open
@@ -272,9 +289,14 @@ export function CaseLibraryPanel() {
                   <span className="text-xs text-gray-500 truncate block">{u.institution}</span>
                 )}
               </div>
-              <span className="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded shrink-0 ml-2">
-                {u.patientCount}
-              </span>
+              <div className="flex flex-col items-end gap-0.5 shrink-0 ml-2">
+                <span className="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">
+                  {u.patientCount} {u.patientCount === 1 ? 'case' : 'cases'}
+                </span>
+                <span className="text-xs bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded">
+                  {u.noteCount} {u.noteCount === 1 ? 'note' : 'notes'}
+                </span>
+              </div>
             </div>
           </button>
         ))}
@@ -327,16 +349,13 @@ export function CaseLibraryPanel() {
             key={e.encounterFhirId}
             onClick={() => {
               if (view.type === 'patient-encounters') {
-                handleEncounterClick(view.patientFhirId);
+                handleEncounterClick(view.patientFhirId, e.encounterFhirId);
               }
             }}
             className="w-full text-left px-3 py-2 hover:bg-blue-50 border-b border-gray-100"
           >
             <div className="text-sm font-medium">
               {formatDate(e.date)} &middot; {e.classDisplay}
-            </div>
-            <div className="text-xs text-gray-500">
-              Signed by {e.signedBy || 'Unknown'} {e.signedAt ? `on ${formatDate(e.signedAt)}` : ''}
             </div>
             {e.notePreview && (
               <div className="text-xs text-gray-400 truncate mt-0.5">{e.notePreview}</div>
@@ -356,16 +375,13 @@ export function CaseLibraryPanel() {
         activity.map((a) => (
           <button
             key={a.encounterFhirId}
-            onClick={() => handleEncounterClick(a.patientFhirId)}
+            onClick={() => handleEncounterClick(a.patientFhirId, a.encounterFhirId)}
             className="w-full text-left px-3 py-2 hover:bg-blue-50 border-b border-gray-100"
           >
             <div className="text-sm font-medium truncate">{a.patientName}</div>
-            <div className="text-xs text-gray-500">
-              {a.classDisplay} &middot; {a.signedBy || 'Unknown'}
-            </div>
-            <div className="text-xs text-gray-400">
-              {formatDate(a.signedAt)}
-            </div>
+            <div className="text-xs text-gray-500">{a.classDisplay}</div>
+            <div className="text-xs text-gray-500">{a.signedBy || 'Unknown'}</div>
+            <div className="text-xs text-gray-400">{formatDate(a.signedAt)}</div>
           </button>
         ))}
     </div>

@@ -66,19 +66,37 @@ export async function GET(request: NextRequest) {
 
       const users = await prisma.user.findMany({
         where: { onboardingComplete: true },
-        include: { _count: { select: { patients: true } } },
+        include: {
+          _count: { select: { patients: true } },
+          patients: { select: { patientFhirId: true } },
+        },
         orderBy: { name: "asc" },
       });
 
-      return NextResponse.json(
-        users.map((u) => ({
-          id: u.id,
-          name: u.name,
-          email: u.email,
-          institution: u.institution,
-          patientCount: u._count.patients,
-        }))
+      // Fetch signed note counts per user in parallel
+      const results = await Promise.all(
+        users.map(async (u) => {
+          let noteCount = 0;
+          if (u.patients.length > 0) {
+            const allEncounters = (
+              await Promise.all(
+                u.patients.map((p) => fetchPatientEncounters(p.patientFhirId))
+              )
+            ).flat();
+            noteCount = allEncounters.filter((e) => e.isSigned).length;
+          }
+          return {
+            id: u.id,
+            name: u.name,
+            email: u.email,
+            institution: u.institution,
+            patientCount: u._count.patients,
+            noteCount,
+          };
+        })
       );
+
+      return NextResponse.json(results);
     }
 
     // --- User's patients with signed encounter counts ---
