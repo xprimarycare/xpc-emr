@@ -178,6 +178,14 @@ export function EncounterMetadataBar() {
         if (activePatient && activeTabId) {
           updateTabProperties(activePatient.id, activeTabId, { isSigned: true, signedAt: now, signedBy: signer });
         }
+        // Auto-assign patient to current user for case library
+        if (activePatient?.fhirId) {
+          fetch('/api/user/patients', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ patientFhirId: activePatient.fhirId }),
+          }).catch(() => {});
+        }
         setStatus('success');
         setTimeout(() => setStatus('idle'), 2000);
       }
