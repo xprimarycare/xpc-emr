@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const { patientFhirId } = await request.json()
+    const { patientFhirId, userId } = await request.json()
 
     if (!patientFhirId?.trim()) {
       return NextResponse.json(
@@ -52,16 +52,33 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Allow assigning to another user (e.g. when selecting a PCP)
+    const targetUserId = userId?.trim() || session.user.id
+
+    // Validate target user exists and is onboarded
+    if (targetUserId !== session.user.id) {
+      const targetUser = await prisma.user.findUnique({
+        where: { id: targetUserId },
+        select: { id: true, onboardingComplete: true },
+      })
+      if (!targetUser || !targetUser.onboardingComplete) {
+        return NextResponse.json(
+          { error: "Target user not found" },
+          { status: 404 }
+        )
+      }
+    }
+
     const assignment = await prisma.userPatient.upsert({
       where: {
         userId_patientFhirId: {
-          userId: session.user.id,
+          userId: targetUserId,
           patientFhirId: patientFhirId.trim(),
         },
       },
       update: {},
       create: {
-        userId: session.user.id,
+        userId: targetUserId,
         patientFhirId: patientFhirId.trim(),
       },
     })
