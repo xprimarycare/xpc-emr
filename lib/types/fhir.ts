@@ -428,6 +428,7 @@ export interface FhirCareTeam {
   subject?: FhirReference;
   participant?: FhirCareTeamParticipant[];
   note?: Array<{ text?: string }>;
+  extension?: FhirExtension[];
 }
 
 export type FhirCareTeamBundle = FhirBundle<FhirCareTeam>;

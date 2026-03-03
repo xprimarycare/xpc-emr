@@ -11,6 +11,8 @@ export interface AppCareTeamMember {
   status: 'proposed' | 'active' | 'suspended' | 'inactive' | 'entered-in-error';
   /** Free-text note */
   note?: string;
+  /** Database User ID when this care team member is a system user (e.g. PCP) */
+  pcpUserId?: string;
   /** SNOMED CT code for the role/specialty */
   coding?: {
     system: string;

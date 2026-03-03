@@ -15,26 +15,58 @@ import {
 type SaveStatus = 'idle' | 'loading' | 'saving' | 'success' | 'error';
 type SyncStatus = 'idle' | 'resolving' | 'syncing' | 'success' | 'error';
 
+interface UserOption {
+  id: string;
+  name: string | null;
+}
+
+function isPcpMember(member: AppCareTeamMember): boolean {
+  return member.coding?.code === '446050000';
+}
+
 export function CareTeamTab({ refreshKey }: { refreshKey?: number }) {
   const { activePatient } = usePatient();
   const isFhirPatient = !!activePatient?.fhirId;
   const editorRef = useRef<HTMLDivElement>(null);
 
-  const [members, setMembers] = useState<AppCareTeamMember[]>([]);
+  const [allMembers, setAllMembers] = useState<AppCareTeamMember[]>([]);
   const [status, setStatus] = useState<SaveStatus>('idle');
   const [error, setError] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<Partial<AppCareTeamMember>>({});
+
+  // PCP state
+  const [availableUsers, setAvailableUsers] = useState<UserOption[]>([]);
+  const [pcpSaving, setPcpSaving] = useState(false);
 
   // Sync state
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('idle');
   const [syncError, setSyncError] = useState<string | null>(null);
   const [resolvedEntries, setResolvedEntries] = useState<ResolvedCareTeamEntry[]>([]);
 
+  // Derived: separate PCP from regular members
+  const pcpMember = allMembers.find(isPcpMember) || null;
+  const members = allMembers.filter((m) => !isPcpMember(m));
+
+  // Fetch available users for PCP dropdown
+  useEffect(() => {
+    if (!isFhirPatient) return;
+    let cancelled = false;
+    fetch('/api/user/list')
+      .then((res) => res.json())
+      .then((data) => {
+        if (!cancelled && data.users) {
+          setAvailableUsers(data.users);
+        }
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [isFhirPatient]);
+
   // Fetch care team members when FHIR patient changes
   useEffect(() => {
     if (!isFhirPatient || !activePatient?.fhirId) {
-      setMembers([]);
+      setAllMembers([]);
       return;
     }
 
@@ -47,13 +79,88 @@ export function CareTeamTab({ refreshKey }: { refreshKey?: number }) {
         setError(result.error);
         setStatus('error');
       } else {
-        setMembers(result.members);
+        setAllMembers(result.members);
         setError(null);
         setStatus('idle');
       }
     });
     return () => { cancelled = true; };
   }, [activePatient?.fhirId, isFhirPatient, refreshKey]);
+
+  // PCP change handler
+  const handlePcpChange = async (userId: string) => {
+    if (!activePatient?.fhirId) return;
+    setPcpSaving(true);
+    setError(null);
+
+    try {
+      if (!userId) {
+        // Clear PCP — delete the CareTeam resource
+        if (pcpMember?.fhirId) {
+          const result = await deleteFhirCareTeamMember(pcpMember.fhirId);
+          if (!result.success) {
+            setError(result.error || 'Failed to remove PCP');
+            return;
+          }
+          setAllMembers((prev) => prev.filter((m) => m.id !== pcpMember.id));
+        }
+        return;
+      }
+
+      const selectedUser = availableUsers.find((u) => u.id === userId);
+      if (!selectedUser) return;
+
+      const pcpData: AppCareTeamMember = {
+        id: pcpMember?.id || `careteam-pcp-${Date.now()}`,
+        fhirId: pcpMember?.fhirId || '',
+        name: selectedUser.name || 'Unknown provider',
+        role: 'Primary care provider',
+        status: 'active',
+        pcpUserId: userId,
+        coding: {
+          system: 'http://snomed.info/sct',
+          code: '446050000',
+          display: 'Primary care provider',
+        },
+      };
+
+      let result;
+      if (pcpMember?.fhirId) {
+        // Update existing
+        result = await upsertFhirCareTeamMember(pcpData, activePatient.fhirId);
+      } else {
+        // Create new
+        result = await createFhirCareTeamMember(pcpData, activePatient.fhirId);
+      }
+
+      if (!result.success) {
+        setError(result.error || 'Failed to save PCP');
+        return;
+      }
+
+      // Auto-assign UserPatient for the selected PCP user
+      const assignRes = await fetch('/api/user/patients', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          patientFhirId: activePatient.fhirId,
+          userId,
+        }),
+      });
+      if (!assignRes.ok) {
+        const body = await assignRes.json().catch(() => ({}));
+        setError(body.error || 'PCP saved but failed to assign patient to user');
+      }
+
+      // Re-fetch members to get the updated FHIR IDs
+      const refreshed = await searchFhirCareTeamMembers(activePatient.fhirId);
+      if (!refreshed.error) {
+        setAllMembers(refreshed.members);
+      }
+    } finally {
+      setPcpSaving(false);
+    }
+  };
 
   const handleEdit = (member: AppCareTeamMember) => {
     setEditingId(member.id);
@@ -69,9 +176,9 @@ export function CareTeamTab({ refreshKey }: { refreshKey?: number }) {
     if (!activePatient?.fhirId) return;
 
     const updated = { ...member, ...editForm } as AppCareTeamMember;
-    const previousMembers = members;
+    const previousMembers = allMembers;
 
-    setMembers((prev) =>
+    setAllMembers((prev) =>
       prev.map((m) => (m.id === member.id ? updated : m))
     );
     setEditingId(null);
@@ -84,7 +191,7 @@ export function CareTeamTab({ refreshKey }: { refreshKey?: number }) {
       setStatus('success');
       setTimeout(() => setStatus('idle'), 2000);
     } else {
-      setMembers(previousMembers);
+      setAllMembers(previousMembers);
       setError(result.error || 'Failed to save');
       setStatus('error');
     }
@@ -93,8 +200,8 @@ export function CareTeamTab({ refreshKey }: { refreshKey?: number }) {
   const handleDelete = async (member: AppCareTeamMember) => {
     if (!member.fhirId) return;
 
-    const previousMembers = members;
-    setMembers((prev) => prev.filter((m) => m.id !== member.id));
+    const previousMembers = allMembers;
+    setAllMembers((prev) => prev.filter((m) => m.id !== member.id));
     setEditingId(null);
     setEditForm({});
 
@@ -105,7 +212,7 @@ export function CareTeamTab({ refreshKey }: { refreshKey?: number }) {
       setStatus('success');
       setTimeout(() => setStatus('idle'), 2000);
     } else {
-      setMembers(previousMembers);
+      setAllMembers(previousMembers);
       setError(result.error || 'Failed to delete');
       setStatus('error');
     }
@@ -172,7 +279,7 @@ export function CareTeamTab({ refreshKey }: { refreshKey?: number }) {
       // Re-fetch members list from Medplum
       const refreshed = await searchFhirCareTeamMembers(activePatient.fhirId);
       if (!refreshed.error) {
-        setMembers(refreshed.members);
+        setAllMembers(refreshed.members);
       }
     } else {
       setSyncStatus('error');
@@ -214,6 +321,33 @@ export function CareTeamTab({ refreshKey }: { refreshKey?: number }) {
             </div>
           )}
 
+          {/* PCP Row — always visible for FHIR patients */}
+          {isFhirPatient && status !== 'loading' && (
+            <div className="mb-4 p-4 border border-gray-200 rounded-lg bg-gray-50">
+              <div className="flex items-center gap-3">
+                <label className="text-sm font-medium text-gray-700 whitespace-nowrap">
+                  PCP:
+                </label>
+                <select
+                  className="flex-1 px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white disabled:opacity-50 disabled:cursor-not-allowed"
+                  value={pcpMember?.pcpUserId || ''}
+                  onChange={(e) => handlePcpChange(e.target.value)}
+                  disabled={pcpSaving}
+                >
+                  <option value="">Select PCP...</option>
+                  {availableUsers.map((user) => (
+                    <option key={user.id} value={user.id}>
+                      {user.name || 'Unnamed user'}
+                    </option>
+                  ))}
+                </select>
+                {pcpSaving && (
+                  <span className="text-xs text-blue-600">Saving...</span>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Loading state */}
           {status === 'loading' && (
             <div className="text-gray-400 text-sm text-center py-8">
@@ -222,7 +356,7 @@ export function CareTeamTab({ refreshKey }: { refreshKey?: number }) {
           )}
 
           {/* Empty state */}
-          {status !== 'loading' && members.length === 0 && status !== 'error' && (
+          {status !== 'loading' && members.length === 0 && !pcpMember && status !== 'error' && (
             <div className="text-gray-400 text-sm text-center py-8">
               No care team members found in Medplum
             </div>
