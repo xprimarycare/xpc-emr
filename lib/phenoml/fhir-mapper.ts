@@ -736,6 +736,7 @@ export function mapFhirEncounterToAppEncounter(
   const isSigned = sigExt?.extension?.find(e => e.url === "signed")?.valueBoolean;
   const signedAt = sigExt?.extension?.find(e => e.url === "signedAt")?.valueDateTime;
   const signedBy = sigExt?.extension?.find(e => e.url === "signedBy")?.valueString;
+  const signedById = sigExt?.extension?.find(e => e.url === "signedById")?.valueString;
 
   return {
     id: `enc-${encounter.id}`,
@@ -748,7 +749,7 @@ export function mapFhirEncounterToAppEncounter(
     endDate: encounter.period?.end,
     noteText: impression?.note?.[0]?.text || impression?.summary || impression?.description || "",
     patientFhirId: encounter.subject?.reference?.replace("Patient/", "") || "",
-    ...(isSigned ? { isSigned, signedAt, signedBy } : {}),
+    ...(isSigned ? { isSigned, signedAt, signedBy, signedById } : {}),
   };
 }
 
@@ -784,6 +785,7 @@ export function mapAppEncounterToFhirEncounter(
           { url: "signed", valueBoolean: true },
           ...(enc.signedAt ? [{ url: "signedAt", valueDateTime: enc.signedAt }] : []),
           ...(enc.signedBy ? [{ url: "signedBy", valueString: enc.signedBy }] : []),
+          ...(enc.signedById ? [{ url: "signedById", valueString: enc.signedById }] : []),
         ],
       },
     ];
@@ -1423,6 +1425,11 @@ export function mapFhirCareTeamToAppCareTeamMember(fhir: FhirCareTeam): AppCareT
   const participant = fhir.participant?.[0];
   const roleCoding = participant?.role?.[0]?.coding?.[0];
 
+  // Read pcpUserId from extension
+  const pcpUserIdExt = fhir.extension?.find(
+    (e) => e.url === 'https://app.phenoml.com/fhir/StructureDefinition/careteam-pcp-user-id'
+  );
+
   return {
     id: `careteam-${fhir.id}`,
     fhirId: fhir.id,
@@ -1432,6 +1439,7 @@ export function mapFhirCareTeamToAppCareTeamMember(fhir: FhirCareTeam): AppCareT
       || '',
     status: (fhir.status as AppCareTeamMember['status']) || 'active',
     note: fhir.note?.[0]?.text,
+    pcpUserId: pcpUserIdExt?.valueString,
     coding: roleCoding ? {
       system: roleCoding.system || '',
       code: roleCoding.code || '',
@@ -1447,6 +1455,20 @@ export function mapAppCareTeamMemberToFhirCareTeam(
   member: AppCareTeamMember,
   patientFhirId: string
 ): FhirCareTeam {
+  // Build member reference: use Practitioner reference if available via pcpUserId context,
+  // otherwise fall back to display-only
+  const memberRef: { reference?: string; display?: string } = {
+    display: member.name,
+  };
+
+  // Build extensions for pcpUserId
+  const extensions: FhirCareTeam['extension'] = member.pcpUserId
+    ? [{
+        url: 'https://app.phenoml.com/fhir/StructureDefinition/careteam-pcp-user-id',
+        valueString: member.pcpUserId,
+      }]
+    : undefined;
+
   return {
     resourceType: 'CareTeam',
     id: member.fhirId,
@@ -1470,11 +1492,10 @@ export function mapAppCareTeamMemberToFhirCareTeam(
         }] : undefined,
         text: member.role,
       }] : undefined,
-      member: {
-        display: member.name,
-      },
+      member: memberRef,
     }],
     note: member.note ? [{ text: member.note }] : undefined,
+    extension: extensions,
   };
 }
 
