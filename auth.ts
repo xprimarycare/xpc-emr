@@ -90,34 +90,32 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   },
   callbacks: {
     async jwt({ token, user, trigger }) {
-      // On sign-in, seed the token from the DB user
       if (user) {
         token.id = user.id
-        token.institution = user.institution ?? null
-        token.npi = user.npi ?? null
-        token.fhirPractitionerId = user.fhirPractitionerId ?? null
-        token.onboardingComplete = user.onboardingComplete ?? false
-        token.role = user.role ?? 'user'
       }
 
-      // Only refresh from DB when explicitly triggered (e.g. after onboarding)
-      if (trigger === "update" && token.id) {
-        const dbUser = await prisma.user.findUnique({
-          where: { id: token.id as string },
-          select: {
-            institution: true,
-            npi: true,
-            fhirPractitionerId: true,
-            onboardingComplete: true,
-            role: true,
-          },
-        })
-        if (dbUser) {
-          token.institution = dbUser.institution
-          token.npi = dbUser.npi
-          token.fhirPractitionerId = dbUser.fhirPractitionerId
-          token.onboardingComplete = dbUser.onboardingComplete
-          token.role = dbUser.role
+      // On sign-in or explicit update, fetch fresh data from DB
+      if ((user || trigger === "update") && token.id) {
+        try {
+          const dbUser = await prisma.user.findUnique({
+            where: { id: token.id as string },
+            select: {
+              institution: true,
+              npi: true,
+              fhirPractitionerId: true,
+              onboardingComplete: true,
+              role: true,
+            },
+          })
+          if (dbUser) {
+            token.institution = dbUser.institution
+            token.npi = dbUser.npi
+            token.fhirPractitionerId = dbUser.fhirPractitionerId
+            token.onboardingComplete = dbUser.onboardingComplete
+            token.role = dbUser.role
+          }
+        } catch {
+          // DB unavailable — keep existing token values
         }
       }
 
