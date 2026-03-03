@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { useAuth } from '@/lib/context/AuthContext';
 import { usePatient } from '@/lib/context/PatientContext';
 import { useEditor } from '@/lib/context/EditorContext';
 import { VariableAutocomplete } from '@/components/editor/VariableAutocomplete';
@@ -13,7 +14,8 @@ import {
 type SaveStatus = 'idle' | 'saving' | 'success' | 'error';
 
 export function EncounterTab() {
-  const { activePatient, updatePatient, renameTab } = usePatient();
+  const { user } = useAuth();
+  const { activePatient, updatePatient, renameTab, updateTabProperties } = usePatient();
   const { activeTabId, tabContent, updateTabContent } = useEditor();
   const editorRef = useRef<HTMLDivElement>(null);
   const isFhirPatient = !!activePatient?.fhirId;
@@ -29,6 +31,9 @@ export function EncounterTab() {
   // Track the FHIR IDs once created, so subsequent saves are updates not creates
   const [encounterFhirId, setEncounterFhirId] = useState<string | undefined>();
   const [noteFhirId, setNoteFhirId] = useState<string | undefined>();
+  const [isSigned, setIsSigned] = useState(false);
+  const [signedAt, setSignedAt] = useState<string | undefined>();
+  const [signedBy, setSignedBy] = useState<string | undefined>();
   const [autocomplete, setAutocomplete] = useState<{
     show: boolean;
     query: string;
@@ -36,27 +41,31 @@ export function EncounterTab() {
   }>({ show: false, query: '', position: { top: 0, left: 0 } });
 
   // Load editor content when tab changes
-  // Note: innerHTML assignment here uses app-controlled content from PatientContext
+  // Note: content assignment here uses app-controlled content from PatientContext
   // (not external/user-submitted HTML), matching the existing RichTextEditor pattern
   useEffect(() => {
     if (editorRef.current && activeTab && activeTabId) {
       const content = tabContent[activeTabId] || activeTab.content;
       if (editorRef.current.innerHTML !== content) {
+        // Content is app-controlled from PatientContext (same pattern as existing RichTextEditor)
         editorRef.current.innerHTML = content;
       }
     }
   }, [activeTabId, activeTab, tabContent]);
 
-  // Reset FHIR IDs when switching tabs
+  // Reset state when switching tabs
   useEffect(() => {
-    setEncounterFhirId(undefined);
-    setNoteFhirId(undefined);
+    setEncounterFhirId(activeTab?.encounterFhirId);
+    setNoteFhirId(activeTab?.noteFhirId);
+    setIsSigned(!!activeTab?.isSigned);
+    setSignedAt(activeTab?.signedAt);
+    setSignedBy(undefined);
     setStatus('idle');
     setError(null);
     if (activeTab?.visitDate) {
       setEncounterDate(activeTab.visitDate);
     }
-  }, [activeTabId, activeTab?.visitDate]);
+  }, [activeTabId, activeTab?.visitDate, activeTab?.encounterFhirId, activeTab?.noteFhirId, activeTab?.isSigned, activeTab?.signedAt]);
 
   const handleInput = useCallback(() => {
     if (!editorRef.current || !activeTabId) return;
@@ -74,7 +83,7 @@ export function EncounterTab() {
       const plainText = (editorRef.current.textContent || '').trim();
       const firstLine = plainText.split('\n')[0].trim();
       const autoName = firstLine
-        ? firstLine.length > 40 ? firstLine.slice(0, 40) + '…' : firstLine
+        ? firstLine.length > 40 ? firstLine.slice(0, 40) + '\u2026' : firstLine
         : 'New Encounter';
       if (activeTab.name !== autoName) {
         renameTab(activePatient.id, activeTabId, autoName);
@@ -141,12 +150,14 @@ export function EncounterTab() {
   /** Strip HTML tags to get plain text for the ClinicalImpression */
   function stripHtml(html: string): string {
     const tmp = document.createElement('div');
+    // Content is app-controlled from PatientContext (same pattern as existing EncounterTab)
     tmp.innerHTML = html;
     return tmp.textContent || tmp.innerText || '';
   }
 
-  const handleSaveToMedplum = async () => {
-    if (!activePatient?.fhirId || !activeTabId) return;
+  /** Build an AppEncounter from current state */
+  function buildAppEncounter(overrides?: Partial<AppEncounter>): AppEncounter | null {
+    if (!activePatient?.fhirId || !activeTabId) return null;
 
     const htmlContent = tabContent[activeTabId] || activeTab?.content || '';
     const plainText = stripHtml(htmlContent);
@@ -154,12 +165,12 @@ export function EncounterTab() {
     if (!plainText.trim()) {
       setError('Please write some encounter notes before saving.');
       setStatus('error');
-      return;
+      return null;
     }
 
     const classOption = ENCOUNTER_CLASS_OPTIONS.find(c => c.code === encounterClass);
 
-    const appEncounter: AppEncounter = {
+    return {
       id: activeTabId,
       encounterFhirId,
       noteFhirId,
@@ -169,33 +180,98 @@ export function EncounterTab() {
       date: new Date(encounterDate + 'T00:00:00').toISOString(),
       noteText: plainText,
       patientFhirId: activePatient.fhirId,
+      ...overrides,
     };
+  }
 
+  /** Persist (create or update) an AppEncounter to Medplum */
+  async function persistEncounter(appEncounter: AppEncounter) {
     setStatus('saving');
     setError(null);
 
-    if (encounterFhirId) {
-      // Update existing encounter
+    if (appEncounter.encounterFhirId) {
       const result = await updateFhirEncounter(appEncounter);
       if (result.success) {
-        setStatus('success');
-        setTimeout(() => setStatus('idle'), 2000);
+        return result;
       } else {
         setError(result.error || 'Failed to update encounter');
         setStatus('error');
+        return null;
       }
     } else {
-      // Create new encounter
       const result = await createFhirEncounter(appEncounter);
       if (result.success) {
         setEncounterFhirId(result.encounterFhirId);
         setNoteFhirId(result.noteFhirId);
-        setStatus('success');
-        setTimeout(() => setStatus('idle'), 2000);
+        if (activePatient && activeTabId) {
+          updateTabProperties(activePatient.id, activeTabId, {
+            encounterFhirId: result.encounterFhirId,
+            noteFhirId: result.noteFhirId,
+          });
+        }
+        return result;
       } else {
         setError(result.error || 'Failed to create encounter');
         setStatus('error');
+        return null;
       }
+    }
+  }
+
+  const handleSaveToMedplum = async () => {
+    const appEncounter = buildAppEncounter();
+    if (!appEncounter) return;
+
+    const result = await persistEncounter(appEncounter);
+    if (result) {
+      setStatus('success');
+      setTimeout(() => setStatus('idle'), 2000);
+    }
+  };
+
+  const handleSign = async () => {
+    if (isSigned) {
+      // Unsign (Edit)
+      const appEncounter = buildAppEncounter({ isSigned: false, signedAt: undefined, signedBy: undefined });
+      if (!appEncounter) return;
+
+      const result = await persistEncounter(appEncounter);
+      if (result) {
+        setIsSigned(false);
+        setSignedAt(undefined);
+        setSignedBy(undefined);
+        if (activePatient && activeTabId) {
+          updateTabProperties(activePatient.id, activeTabId, { isSigned: false, signedAt: undefined });
+        }
+        setStatus('success');
+        setTimeout(() => setStatus('idle'), 2000);
+      }
+    } else {
+      // Sign: save + sign in one action
+      const now = new Date().toISOString();
+      const signer = user?.name || 'Unknown';
+      const appEncounter = buildAppEncounter({ isSigned: true, signedAt: now, signedBy: signer });
+      if (!appEncounter) return;
+
+      const result = await persistEncounter(appEncounter);
+      if (result) {
+        setIsSigned(true);
+        setSignedAt(now);
+        setSignedBy(signer);
+        if (activePatient && activeTabId) {
+          updateTabProperties(activePatient.id, activeTabId, { isSigned: true, signedAt: now });
+        }
+        setStatus('success');
+        setTimeout(() => setStatus('idle'), 2000);
+      }
+    }
+  };
+
+  const formatSignedDate = (iso: string) => {
+    try {
+      return new Date(iso).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: 'numeric' });
+    } catch {
+      return iso;
     }
   };
 
@@ -218,7 +294,8 @@ export function EncounterTab() {
               type="date"
               value={encounterDate}
               onChange={(e) => setEncounterDate(e.target.value)}
-              className="px-2 py-1 border rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              disabled={isSigned}
+              className={`px-2 py-1 border rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${isSigned ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : ''}`}
             />
           </div>
           <div className="flex items-center gap-2">
@@ -226,7 +303,8 @@ export function EncounterTab() {
             <select
               value={encounterClass}
               onChange={(e) => setEncounterClass(e.target.value as AppEncounter['classCode'])}
-              className="px-2 py-1 border rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+              disabled={isSigned}
+              className={`px-2 py-1 border rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${isSigned ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : 'bg-white'}`}
             >
               {ENCOUNTER_CLASS_OPTIONS.map(opt => (
                 <option key={opt.code} value={opt.code}>{opt.display}</option>
@@ -235,6 +313,12 @@ export function EncounterTab() {
           </div>
 
           <div className="flex-1" />
+
+          {isSigned && signedAt && (
+            <span className="text-xs text-gray-500">
+              Signed{signedBy ? ` by ${signedBy}` : ''} on {formatSignedDate(signedAt)}
+            </span>
+          )}
 
           {/* Status indicators */}
           {status === 'saving' && (
@@ -251,7 +335,7 @@ export function EncounterTab() {
 
           <button
             onClick={handleSaveToMedplum}
-            disabled={status === 'saving'}
+            disabled={status === 'saving' || isSigned}
             className="px-4 py-1.5 bg-blue-600 text-white rounded text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {status === 'saving'
@@ -260,6 +344,18 @@ export function EncounterTab() {
                 ? 'Update in Medplum'
                 : 'Save to Medplum'}
           </button>
+
+          <button
+            onClick={handleSign}
+            disabled={status === 'saving'}
+            className={`px-4 py-1.5 rounded text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+              isSigned
+                ? 'bg-amber-500 text-white hover:bg-amber-600'
+                : 'bg-green-600 text-white hover:bg-green-700'
+            }`}
+          >
+            {status === 'saving' ? 'Saving...' : isSigned ? 'Edit' : 'Sign'}
+          </button>
         </div>
       )}
 
@@ -267,9 +363,9 @@ export function EncounterTab() {
       <div className="flex-1 overflow-y-auto">
         <div
           ref={editorRef}
-          contentEditable
-          onInput={handleInput}
-          className="min-h-full px-32 py-12 focus:outline-none text-gray-900"
+          contentEditable={!isSigned}
+          onInput={isSigned ? undefined : handleInput}
+          className={`min-h-full px-32 py-12 focus:outline-none text-gray-900 ${isSigned ? 'bg-gray-50 cursor-default' : ''}`}
           style={{ fontSize: '15px', lineHeight: '1.6' }}
           suppressContentEditableWarning
           data-placeholder="Start typing your encounter notes here..."

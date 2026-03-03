@@ -712,6 +712,8 @@ export function mapFhirBundleToSocialHistories(
 
 // --- Encounter Mappers ---
 
+const ENCOUNTER_SIGNATURE_EXT = "http://phenoml.com/fhir/StructureDefinition/encounter-signature";
+
 const ENCOUNTER_CLASS_DISPLAY: Record<string, string> = {
   AMB: "Ambulatory",
   IMP: "Inpatient",
@@ -729,6 +731,12 @@ export function mapFhirEncounterToAppEncounter(
 ): AppEncounter {
   const classCode = (encounter.class?.code || "AMB") as AppEncounter["classCode"];
 
+  // Parse signing extension
+  const sigExt = encounter.extension?.find(e => e.url === ENCOUNTER_SIGNATURE_EXT);
+  const isSigned = sigExt?.extension?.find(e => e.url === "signed")?.valueBoolean;
+  const signedAt = sigExt?.extension?.find(e => e.url === "signedAt")?.valueDateTime;
+  const signedBy = sigExt?.extension?.find(e => e.url === "signedBy")?.valueString;
+
   return {
     id: `enc-${encounter.id}`,
     encounterFhirId: encounter.id,
@@ -740,6 +748,7 @@ export function mapFhirEncounterToAppEncounter(
     endDate: encounter.period?.end,
     noteText: impression?.note?.[0]?.text || impression?.summary || impression?.description || "",
     patientFhirId: encounter.subject?.reference?.replace("Patient/", "") || "",
+    ...(isSigned ? { isSigned, signedAt, signedBy } : {}),
   };
 }
 
@@ -749,7 +758,7 @@ export function mapFhirEncounterToAppEncounter(
 export function mapAppEncounterToFhirEncounter(
   enc: AppEncounter
 ): FhirEncounter {
-  return {
+  const fhirEncounter: FhirEncounter = {
     resourceType: "Encounter",
     id: enc.encounterFhirId,
     status: enc.status,
@@ -766,6 +775,21 @@ export function mapAppEncounterToFhirEncounter(
       end: enc.endDate,
     },
   };
+
+  if (enc.isSigned) {
+    fhirEncounter.extension = [
+      {
+        url: ENCOUNTER_SIGNATURE_EXT,
+        extension: [
+          { url: "signed", valueBoolean: true },
+          ...(enc.signedAt ? [{ url: "signedAt", valueDateTime: enc.signedAt }] : []),
+          ...(enc.signedBy ? [{ url: "signedBy", valueString: enc.signedBy }] : []),
+        ],
+      },
+    ];
+  }
+
+  return fhirEncounter;
 }
 
 /**
