@@ -54,13 +54,13 @@ export function EncounterMetadataBar() {
     setNoteFhirId(activeTab?.noteFhirId);
     setIsSigned(!!activeTab?.isSigned);
     setSignedAt(activeTab?.signedAt);
-    setSignedBy(undefined);
+    setSignedBy(activeTab?.signedBy);
     setStatus('idle');
     setError(null);
     if (activeTab?.visitDate) {
       setEncounterDate(activeTab.visitDate);
     }
-  }, [activeTabId, activeTab?.visitDate, activeTab?.encounterFhirId, activeTab?.noteFhirId, activeTab?.isSigned, activeTab?.signedAt]);
+  }, [activeTabId, activeTab?.visitDate, activeTab?.encounterFhirId, activeTab?.noteFhirId, activeTab?.isSigned, activeTab?.signedAt, activeTab?.signedBy]);
 
   /** Strip HTML tags to get plain text for the ClinicalImpression.
    * Note: content is app-controlled from PatientContext, not external user HTML. */
@@ -158,7 +158,7 @@ export function EncounterMetadataBar() {
         setSignedAt(undefined);
         setSignedBy(undefined);
         if (activePatient && activeTabId) {
-          updateTabProperties(activePatient.id, activeTabId, { isSigned: false, signedAt: undefined });
+          updateTabProperties(activePatient.id, activeTabId, { isSigned: false, signedAt: undefined, signedBy: undefined });
         }
         setStatus('success');
         setTimeout(() => setStatus('idle'), 2000);
@@ -176,7 +176,7 @@ export function EncounterMetadataBar() {
         setSignedAt(now);
         setSignedBy(signer);
         if (activePatient && activeTabId) {
-          updateTabProperties(activePatient.id, activeTabId, { isSigned: true, signedAt: now });
+          updateTabProperties(activePatient.id, activeTabId, { isSigned: true, signedAt: now, signedBy: signer });
         }
         setStatus('success');
         setTimeout(() => setStatus('idle'), 2000);
