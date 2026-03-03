@@ -16,6 +16,7 @@ model User {
   institution        String?
   npi                String?
   fhirPractitionerId String?
+  role               String    @default("user")
   onboardingComplete Boolean   @default(false)
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt

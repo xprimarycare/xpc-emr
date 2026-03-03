@@ -34,6 +34,7 @@ export function EncounterTab() {
   const [isSigned, setIsSigned] = useState(false);
   const [signedAt, setSignedAt] = useState<string | undefined>();
   const [signedBy, setSignedBy] = useState<string | undefined>();
+  const [signedById, setSignedById] = useState<string | undefined>();
   const [autocomplete, setAutocomplete] = useState<{
     show: boolean;
     query: string;
@@ -59,13 +60,14 @@ export function EncounterTab() {
     setNoteFhirId(activeTab?.noteFhirId);
     setIsSigned(!!activeTab?.isSigned);
     setSignedAt(activeTab?.signedAt);
-    setSignedBy(undefined);
+    setSignedBy(activeTab?.signedBy);
+    setSignedById(activeTab?.signedById);
     setStatus('idle');
     setError(null);
     if (activeTab?.visitDate) {
       setEncounterDate(activeTab.visitDate);
     }
-  }, [activeTabId, activeTab?.visitDate, activeTab?.encounterFhirId, activeTab?.noteFhirId, activeTab?.isSigned, activeTab?.signedAt]);
+  }, [activeTabId, activeTab?.visitDate, activeTab?.encounterFhirId, activeTab?.noteFhirId, activeTab?.isSigned, activeTab?.signedAt, activeTab?.signedBy, activeTab?.signedById]);
 
   const handleInput = useCallback(() => {
     if (!editorRef.current || !activeTabId) return;
@@ -232,7 +234,7 @@ export function EncounterTab() {
   const handleSign = async () => {
     if (isSigned) {
       // Unsign (Edit)
-      const appEncounter = buildAppEncounter({ isSigned: false, signedAt: undefined, signedBy: undefined });
+      const appEncounter = buildAppEncounter({ isSigned: false, signedAt: undefined, signedBy: undefined, signedById: undefined });
       if (!appEncounter) return;
 
       const result = await persistEncounter(appEncounter);
@@ -240,8 +242,9 @@ export function EncounterTab() {
         setIsSigned(false);
         setSignedAt(undefined);
         setSignedBy(undefined);
+        setSignedById(undefined);
         if (activePatient && activeTabId) {
-          updateTabProperties(activePatient.id, activeTabId, { isSigned: false, signedAt: undefined });
+          updateTabProperties(activePatient.id, activeTabId, { isSigned: false, signedAt: undefined, signedBy: undefined, signedById: undefined });
         }
         setStatus('success');
         setTimeout(() => setStatus('idle'), 2000);
@@ -250,7 +253,7 @@ export function EncounterTab() {
       // Sign: save + sign in one action
       const now = new Date().toISOString();
       const signer = user?.name || 'Unknown';
-      const appEncounter = buildAppEncounter({ isSigned: true, signedAt: now, signedBy: signer });
+      const appEncounter = buildAppEncounter({ isSigned: true, signedAt: now, signedBy: signer, signedById: user?.id });
       if (!appEncounter) return;
 
       const result = await persistEncounter(appEncounter);
@@ -258,8 +261,9 @@ export function EncounterTab() {
         setIsSigned(true);
         setSignedAt(now);
         setSignedBy(signer);
+        setSignedById(user?.id);
         if (activePatient && activeTabId) {
-          updateTabProperties(activePatient.id, activeTabId, { isSigned: true, signedAt: now });
+          updateTabProperties(activePatient.id, activeTabId, { isSigned: true, signedAt: now, signedBy: signer, signedById: user?.id });
         }
         setStatus('success');
         setTimeout(() => setStatus('idle'), 2000);

@@ -36,4 +36,8 @@ export interface Tab {
   isSigned?: boolean;
   /** ISO datetime when the note was signed */
   signedAt?: string;
+  /** Name of the clinician who signed */
+  signedBy?: string;
+  /** Database user ID of the clinician who signed */
+  signedById?: string;
 }

@@ -14,6 +14,7 @@ declare module "next-auth" {
       npi: string | null
       fhirPractitionerId: string | null
       onboardingComplete: boolean
+      role: string
     }
   }
 
@@ -22,6 +23,7 @@ declare module "next-auth" {
     npi: string | null
     fhirPractitionerId: string | null
     onboardingComplete: boolean
+    role: string
   }
 }
 
@@ -41,6 +43,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         token.npi = user.npi ?? null
         token.fhirPractitionerId = user.fhirPractitionerId ?? null
         token.onboardingComplete = user.onboardingComplete ?? false
+        token.role = user.role ?? 'user'
       }
 
       // Only refresh from DB when explicitly triggered (e.g. after onboarding)
@@ -52,6 +55,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             npi: true,
             fhirPractitionerId: true,
             onboardingComplete: true,
+            role: true,
           },
         })
         if (dbUser) {
@@ -59,6 +63,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           token.npi = dbUser.npi
           token.fhirPractitionerId = dbUser.fhirPractitionerId
           token.onboardingComplete = dbUser.onboardingComplete
+          token.role = dbUser.role
         }
       }
 
@@ -70,6 +75,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       session.user.npi = token.npi as string | null
       session.user.fhirPractitionerId = token.fhirPractitionerId as string | null
       session.user.onboardingComplete = token.onboardingComplete as boolean
+      session.user.role = token.role as string
       return session
     },
   },

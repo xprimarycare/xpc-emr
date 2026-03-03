@@ -62,6 +62,7 @@ export function LeftSidebar() {
           noteFhirId: enc.noteFhirId,
           isSigned: enc.isSigned,
           signedAt: enc.signedAt,
+          signedBy: enc.signedBy,
         }));
 
       if (newTabs.length > 0) {

@@ -2,7 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { Menu, Users, Plus, Lightbulb, MessageCircle, Calendar, Columns } from 'lucide-react';
+import { Menu, Users, Plus, Lightbulb, MessageCircle, Calendar, Columns, BookOpen } from 'lucide-react';
 import { useAuth } from '@/lib/context/AuthContext';
 import { usePatient } from '@/lib/context/PatientContext';
 import { useSidebar } from '@/lib/context/SidebarContext';
@@ -55,6 +55,13 @@ export function TopBar() {
             title="Browse patients"
           >
             <Users size={20} className="text-gray-600" />
+          </button>
+          <button
+            onClick={() => toggleLeftPanel('caseLibrary')}
+            className="p-1 hover:bg-gray-100 rounded"
+            title="Case Library"
+          >
+            <BookOpen size={20} className="text-gray-600" />
           </button>
           <PatientTabList />
           <button
