@@ -32,4 +32,8 @@ export interface Tab {
   noteFhirId?: string;
   /** FHIR Task resource ID (for tasks synced with Medplum) */
   taskFhirId?: string;
+  /** Whether the encounter note is signed */
+  isSigned?: boolean;
+  /** ISO datetime when the note was signed */
+  signedAt?: string;
 }

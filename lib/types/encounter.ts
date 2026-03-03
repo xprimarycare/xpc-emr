@@ -19,6 +19,12 @@ export interface AppEncounter {
   noteText: string;
   /** Patient FHIR ID this encounter belongs to */
   patientFhirId: string;
+  /** Whether the encounter note has been signed */
+  isSigned?: boolean;
+  /** ISO datetime when the note was signed */
+  signedAt?: string;
+  /** Name of the clinician who signed */
+  signedBy?: string;
 }
 
 export const ENCOUNTER_CLASS_OPTIONS: Array<{
