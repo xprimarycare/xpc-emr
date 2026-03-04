@@ -1,9 +1,9 @@
 import { auth } from "@/auth"
 import { redirect } from "next/navigation"
 import Link from "next/link"
-import { UserManagement } from "./UserManagement"
+import { AssignmentManagement } from "./AssignmentManagement"
 
-export default async function AdminPage() {
+export default async function AssignmentsPage() {
   const session = await auth()
 
   if (!session) {
@@ -16,7 +16,7 @@ export default async function AdminPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="max-w-2xl mx-auto pt-16 px-4">
+      <div className="max-w-4xl mx-auto pt-16 px-4">
         <Link
           href="/"
           className="text-sm text-gray-500 hover:text-gray-700 mb-6 inline-block"
@@ -26,22 +26,13 @@ export default async function AdminPage() {
 
         <div className="bg-white rounded-lg border p-6 space-y-6">
           <div>
-            <h1 className="text-xl font-semibold text-gray-900">Team Management</h1>
-            <p className="text-sm text-gray-500 mt-1">Manage user roles and access</p>
+            <h1 className="text-xl font-semibold text-gray-900">Case Assignments</h1>
+            <p className="text-sm text-gray-500 mt-1">Assign patients to clinicians and manage assignments</p>
           </div>
 
           <hr className="border-gray-200" />
 
-          <UserManagement currentUserId={session.user.id} />
-
-          <hr className="border-gray-200" />
-
-          <Link
-            href="/admin/assignments"
-            className="block text-sm text-blue-600 hover:text-blue-800 font-medium"
-          >
-            Case Assignments &rarr;
-          </Link>
+          <AssignmentManagement />
         </div>
       </div>
     </div>

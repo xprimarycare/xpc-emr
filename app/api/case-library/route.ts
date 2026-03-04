@@ -21,22 +21,42 @@ async function fetchPatientEncounters(patientFhirId: string) {
   return mapFhirBundleToEncounters(encBundle as any, ciBundle as any);
 }
 
-async function fetchPatientName(patientFhirId: string): Promise<string> {
-  if (!providerId) return "Unknown";
+interface PatientInfo {
+  name: string;
+  age: string;
+  sex: string;
+}
+
+async function fetchPatientInfo(patientFhirId: string): Promise<PatientInfo> {
+  if (!providerId) return { name: "Unknown", age: "", sex: "" };
   try {
     const result = await phenomlClient.fhir.search(providerId, "Patient", {}, {
       queryParams: { _id: patientFhirId, _count: "1" },
     });
     const bundle = result as any;
     const patient = bundle?.entry?.[0]?.resource;
-    const name = patient?.name?.[0];
-    if (!name) return "Unknown";
-    const given = name.given?.join(" ") || "";
-    const family = name.family || "";
-    return [given, family].filter(Boolean).join(" ") || "Unknown";
+    const nameEntry = patient?.name?.[0];
+    const given = nameEntry?.given?.join(" ") || "";
+    const family = nameEntry?.family || "";
+    const name = [given, family].filter(Boolean).join(" ") || "Unknown";
+
+    let age = "";
+    if (patient?.birthDate) {
+      const birthYear = new Date(patient.birthDate).getFullYear();
+      age = String(new Date().getFullYear() - birthYear);
+    }
+    const sex = patient?.gender
+      ? patient.gender.charAt(0).toUpperCase()
+      : "";
+
+    return { name, age, sex };
   } catch {
-    return "Unknown";
+    return { name: "Unknown", age: "", sex: "" };
   }
+}
+
+async function fetchPatientName(patientFhirId: string): Promise<string> {
+  return (await fetchPatientInfo(patientFhirId)).name;
 }
 
 // GET /api/case-library?view=...
@@ -118,20 +138,87 @@ export async function GET(request: NextRequest) {
 
       const results = await Promise.all(
         assignments.map(async (a) => {
-          const [patientName, encounters] = await Promise.all([
-            fetchPatientName(a.patientFhirId),
+          const [patientInfo, encounters] = await Promise.all([
+            fetchPatientInfo(a.patientFhirId),
             fetchPatientEncounters(a.patientFhirId),
           ]);
           const signedCount = encounters.filter((e) => e.isSigned).length;
+          // Most recent encounter for note preview and CC
+          const mostRecent = encounters
+            .sort((x, y) => (y.date || "").localeCompare(x.date || ""))[0];
+          const notePreview = mostRecent?.noteText
+            ? mostRecent.noteText.replace(/<[^>]*>/g, "").slice(0, 120)
+            : "";
           return {
             patientFhirId: a.patientFhirId,
-            patientName,
+            patientName: patientInfo.name,
+            patientAge: patientInfo.age,
+            patientSex: patientInfo.sex,
             signedEncounterCount: signedCount,
+            encounterType: mostRecent?.classDisplay || "",
+            notePreview,
+            status: a.status,
+            assignedBy: a.assignedBy,
+            encounterFhirId: a.encounterFhirId,
           };
         })
       );
 
       return NextResponse.json(results);
+    }
+
+    // --- All assignments (admin only) ---
+    if (view === "assignments") {
+      if (!isAdmin) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
+
+      const assignments = await prisma.userPatient.findMany({
+        include: {
+          user: { select: { name: true, email: true } },
+        },
+        orderBy: { assignedAt: "desc" },
+      });
+
+      // Resolve patient names in parallel
+      const patientIds = [...new Set(assignments.map((a) => a.patientFhirId))];
+      const nameMap = new Map<string, string>();
+      await Promise.all(
+        patientIds.map(async (pid) => {
+          nameMap.set(pid, await fetchPatientName(pid));
+        })
+      );
+
+      // Resolve assigner names
+      const assignerIds = [
+        ...new Set(assignments.map((a) => a.assignedBy).filter(Boolean)),
+      ] as string[];
+      const assignerMap = new Map<string, string>();
+      if (assignerIds.length > 0) {
+        const assigners = await prisma.user.findMany({
+          where: { id: { in: assignerIds } },
+          select: { id: true, name: true, email: true },
+        });
+        for (const a of assigners) {
+          assignerMap.set(a.id, a.name || a.email);
+        }
+      }
+
+      return NextResponse.json(
+        assignments.map((a) => ({
+          id: a.id,
+          patientFhirId: a.patientFhirId,
+          patientName: nameMap.get(a.patientFhirId) || "Unknown",
+          clinicianId: a.userId,
+          clinicianName: a.user.name || a.user.email,
+          status: a.status,
+          assignedAt: a.assignedAt.toISOString(),
+          assignedByName: a.assignedBy
+            ? assignerMap.get(a.assignedBy) || "Unknown"
+            : null,
+          encounterFhirId: a.encounterFhirId,
+        }))
+      );
     }
 
     // --- Signed encounters for a specific patient ---
@@ -226,7 +313,7 @@ export async function GET(request: NextRequest) {
     }
 
     return NextResponse.json(
-      { error: "Invalid view parameter. Use: users, user-patients, patient-encounters, or recent-activity" },
+      { error: "Invalid view parameter. Use: users, user-patients, patient-encounters, recent-activity, or assignments" },
       { status: 400 }
     );
   } catch (error) {

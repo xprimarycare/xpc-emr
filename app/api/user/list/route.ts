@@ -20,7 +20,7 @@ export async function GET() {
       select: {
         id: true,
         name: true,
-        ...(isAdmin && { email: true, role: true }),
+        ...(isAdmin && { email: true, role: true, institution: true }),
       },
       orderBy: { name: "asc" },
     })
