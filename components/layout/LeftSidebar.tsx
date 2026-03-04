@@ -32,19 +32,26 @@ export function LeftSidebar() {
 
   // Fetch encounters from Medplum when a FHIR patient is activated
   useEffect(() => {
+    const patientId = activePatient?.id;
     const fhirId = activePatient?.fhirId;
-    if (!fhirId) return;
+    if (!fhirId || !patientId) return;
     if (loadedEncountersRef.current.has(fhirId)) return;
 
     // Mark as loaded immediately to avoid duplicate fetches
     loadedEncountersRef.current.add(fhirId);
 
     searchFhirEncounters(fhirId).then((result) => {
-      if (result.error || result.encounters.length === 0) return;
+      if (result.error) {
+        // Allow retry on failure
+        loadedEncountersRef.current.delete(fhirId);
+        return;
+      }
+      if (result.encounters.length === 0) return;
 
-      // Only add encounters whose FHIR IDs are not already in tabs
+      // Re-read current tabs to avoid stale closure issues
+      const currentPatient = activePatient;
       const existingFhirIds = new Set(
-        activePatient.tabs
+        (currentPatient?.tabs || [])
           .filter((t) => t.encounterFhirId)
           .map((t) => t.encounterFhirId)
       );
@@ -66,8 +73,16 @@ export function LeftSidebar() {
         }));
 
       if (newTabs.length > 0) {
+        const hadNoEncounterTabs = existingFhirIds.size === 0;
         for (const tab of newTabs) {
-          addTabToPatient(activePatient.id, tab);
+          addTabToPatient(patientId, tab);
+        }
+        if (hadNoEncounterTabs) {
+          // Auto-select most recent encounter
+          const sorted = [...newTabs].sort((a, b) =>
+            (b.visitDate || '').localeCompare(a.visitDate || '')
+          );
+          setActiveTabId(sorted[0].id);
         }
       }
     });
@@ -75,17 +90,23 @@ export function LeftSidebar() {
 
   // Fetch tasks from Medplum when a FHIR patient is activated
   useEffect(() => {
+    const patientId = activePatient?.id;
     const fhirId = activePatient?.fhirId;
-    if (!fhirId) return;
+    if (!fhirId || !patientId) return;
     if (loadedTasksRef.current.has(fhirId)) return;
 
     loadedTasksRef.current.add(fhirId);
 
     searchFhirTasks(fhirId).then((result) => {
-      if (result.error || result.tasks.length === 0) return;
+      if (result.error) {
+        // Allow retry on failure
+        loadedTasksRef.current.delete(fhirId);
+        return;
+      }
+      if (result.tasks.length === 0) return;
 
       const existingTaskFhirIds = new Set(
-        activePatient.tabs
+        (activePatient?.tabs || [])
           .filter((t) => t.taskFhirId)
           .map((t) => t.taskFhirId)
       );
@@ -105,7 +126,7 @@ export function LeftSidebar() {
 
       if (newTabs.length > 0) {
         for (const tab of newTabs) {
-          addTabToPatient(activePatient.id, tab);
+          addTabToPatient(patientId, tab);
         }
       }
     });

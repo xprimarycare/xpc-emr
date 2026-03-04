@@ -1,10 +1,15 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
-import { ChevronLeft } from 'lucide-react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { ChevronLeft, UserPlus, Copy } from 'lucide-react';
 import { useEditor } from '@/lib/context/EditorContext';
 import { useAuth } from '@/lib/context/AuthContext';
 import { usePatient } from '@/lib/context/PatientContext';
+import { AssignCaseDialog } from '@/components/dialogs/AssignCaseDialog';
+import { DuplicatePatientDialog } from '@/components/dialogs/DuplicatePatientDialog';
+import { STATUS_BADGE, STATUS_TAB_LABELS, CaseStatus, formatDateTime } from '@/lib/constants/case-status';
+import type { CaseStatusValue } from '@/lib/constants/case-status';
+import { createDefaultTabs } from '@/lib/data/default-tabs';
 
 type CaseLibraryView =
   | { type: 'users' }
@@ -24,7 +29,13 @@ interface UserRow {
 interface PatientRow {
   patientFhirId: string;
   patientName: string;
+  patientAge?: string;
+  patientSex?: string;
   signedEncounterCount: number;
+  encounterType?: string;
+  notePreview?: string;
+  status?: string;
+  encounterFhirId?: string;
 }
 
 interface EncounterRow {
@@ -45,17 +56,20 @@ interface ActivityRow {
   classDisplay: string;
 }
 
+const STATUS_TABS: CaseStatusValue[] = [CaseStatus.WAITING_ROOM, CaseStatus.IN_PROGRESS, CaseStatus.COMPLETED];
+
 export function CaseLibraryPanel() {
   const { leftPanelMode, toggleLeftPanel, setActiveTabId } = useEditor();
   const { user } = useAuth();
-  const { addPatient, setActivePatientId, patients } = usePatient();
+  const { addPatient, setActivePatientId, updatePatient, patients } = usePatient();
 
   const isAdmin = user?.role === 'admin';
 
   const [view, setView] = useState<CaseLibraryView>(
-    isAdmin ? { type: 'users' } : { type: 'user-patients', userId: user?.id || '', userName: 'My Cases' }
+    isAdmin ? { type: 'users' } : { type: 'user-patients', userId: user?.id || '', userName: 'My Patients' }
   );
   const [adminTab, setAdminTab] = useState<'users' | 'recent'>('users');
+  const [statusTab, setStatusTab] = useState<CaseStatusValue>(CaseStatus.WAITING_ROOM);
   // Track the user we drilled into so back from patient-encounters returns to their patients
   const [parentUser, setParentUser] = useState<{ userId: string; userName: string } | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -67,6 +81,10 @@ export function CaseLibraryPanel() {
   const [encounters, setEncounters] = useState<EncounterRow[]>([]);
   const [activity, setActivity] = useState<ActivityRow[]>([]);
 
+  // Dialog states
+  const [assignTarget, setAssignTarget] = useState<{ patientFhirId: string; patientName: string; encounterFhirId?: string } | null>(null);
+  const [duplicateTarget, setDuplicateTarget] = useState<{ patientFhirId: string; patientName: string } | null>(null);
+
   // Reset view when panel opens or role changes
   useEffect(() => {
     if (leftPanelMode === 'caseLibrary') {
@@ -74,7 +92,7 @@ export function CaseLibraryPanel() {
         setView({ type: 'users' });
         setAdminTab('users');
       } else if (user?.id) {
-        setView({ type: 'user-patients', userId: user.id, userName: 'My Cases' });
+        setView({ type: 'user-patients', userId: user.id, userName: 'My Patients' });
       }
     }
   }, [leftPanelMode, isAdmin, user?.id]);
@@ -135,25 +153,22 @@ export function CaseLibraryPanel() {
     fetchData(view);
   }, [view, leftPanelMode, fetchData]);
 
+  // Memoized filtered patients and tab counts (single pass)
+  const { filteredPatients, tabCounts } = useMemo(() => {
+    const counts = { [CaseStatus.WAITING_ROOM]: 0, [CaseStatus.IN_PROGRESS]: 0, [CaseStatus.COMPLETED]: 0 };
+    for (const p of userPatients) {
+      const s = (p.status || CaseStatus.WAITING_ROOM) as CaseStatusValue;
+      if (s in counts) counts[s]++;
+    }
+    const filtered = !isAdmin
+      ? userPatients.filter((p) => (p.status || CaseStatus.WAITING_ROOM) === statusTab)
+      : userPatients;
+    return { filteredPatients: filtered, tabCounts: counts };
+  }, [isAdmin, userPatients, statusTab]);
+
   if (leftPanelMode !== 'caseLibrary') {
     return null;
   }
-
-  const formatDate = (iso?: string) => {
-    if (!iso) return '';
-    try {
-      return new Date(iso).toLocaleString('en-US', {
-        month: 'short',
-        day: 'numeric',
-        year: 'numeric',
-        hour: 'numeric',
-        minute: '2-digit',
-        timeZone: 'America/New_York',
-      });
-    } catch {
-      return iso;
-    }
-  };
 
   const handleNavigate = (nextView: CaseLibraryView) => {
     // Track parent user when drilling from user-patients to patient-encounters
@@ -168,7 +183,7 @@ export function CaseLibraryPanel() {
       if (parentUser) {
         setView({ type: 'user-patients', userId: parentUser.userId, userName: parentUser.userName });
       } else if (!isAdmin && user?.id) {
-        setView({ type: 'user-patients', userId: user.id, userName: 'My Cases' });
+        setView({ type: 'user-patients', userId: user.id, userName: 'My Patients' });
       } else {
         setView({ type: 'users' });
       }
@@ -187,7 +202,28 @@ export function CaseLibraryPanel() {
     }
   };
 
-  const handleEncounterClick = async (patientFhirId: string, encounterFhirId?: string) => {
+  const handlePatientClick = async (patientFhirId: string, patientStatus?: string) => {
+    // For clinicians: auto-transition from waiting_room to in_progress on click
+    if (!isAdmin && patientStatus === CaseStatus.WAITING_ROOM) {
+      try {
+        await fetch('/api/user/patients', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ patientFhirId, status: CaseStatus.IN_PROGRESS }),
+        });
+        // Update local state
+        setUserPatients((prev) =>
+          prev.map((p) =>
+            p.patientFhirId === patientFhirId ? { ...p, status: CaseStatus.IN_PROGRESS } : p
+          )
+        );
+      } catch {
+        // Continue even if status update fails
+      }
+    }
+  };
+
+  const handleEncounterClick = async (patientFhirId: string, encounterFhirId?: string, patientName?: string) => {
     // Check if patient is already open
     const existing = patients.find((p) => p.fhirId === patientFhirId);
     if (existing) {
@@ -198,41 +234,36 @@ export function CaseLibraryPanel() {
         if (tab) setActiveTabId(tab.id);
       }
     } else {
-      // Fetch patient and open them
-      try {
-        const res = await fetch(`/api/fhir/encounter?patient=${patientFhirId}`);
-        if (res.ok) {
-          // Just open via addPatient with minimal data — the full load happens in existing flow
-          addPatient({
-            id: `fhir-${patientFhirId}`,
-            name: 'Loading...',
-            mrn: '',
-            dob: '',
-            sex: '',
-            fhirId: patientFhirId,
-            tabs: [],
-          });
-          // Once tabs load, navigate to the encounter tab
-          if (encounterFhirId) {
-            setTimeout(() => {
-              const patient = patients.find((p) => p.fhirId === patientFhirId);
-              const tab = patient?.tabs.find((t) => t.encounterFhirId === encounterFhirId);
-              if (tab) setActiveTabId(tab.id);
-            }, 500);
+      const patientId = `fhir-${patientFhirId}`;
+      const name = patientName || 'Patient';
+      addPatient({
+        id: patientId,
+        name,
+        mrn: '',
+        dob: '',
+        sex: '',
+        fhirId: patientFhirId,
+        tabs: createDefaultTabs({ name, mrn: '', dob: '', sex: '' }),
+      });
+
+      // Fetch full patient details to fill in demographics
+      fetch(`/api/fhir/patient?id=${patientFhirId}`)
+        .then((res) => (res.ok ? res.json() : null))
+        .then((bundle) => {
+          const resource = bundle?.entry?.[0]?.resource;
+          if (resource) {
+            const fhirName = resource.name?.[0];
+            const given = fhirName?.given?.join(' ') || '';
+            const family = fhirName?.family || '';
+            const fullName = [given, family].filter(Boolean).join(' ');
+            updatePatient(patientId, {
+              name: fullName || name,
+              dob: resource.birthDate || '',
+              sex: resource.gender || '',
+            });
           }
-        }
-      } catch {
-        // Fallback: still try to open
-        addPatient({
-          id: `fhir-${patientFhirId}`,
-          name: 'Patient',
-          mrn: '',
-          dob: '',
-          sex: '',
-          fhirId: patientFhirId,
-          tabs: [],
-        });
-      }
+        })
+        .catch(() => {});
     }
     toggleLeftPanel('sidebar');
   };
@@ -260,6 +291,17 @@ export function CaseLibraryPanel() {
       <span className="truncate">{label}</span>
     </button>
   );
+
+  const renderStatusBadge = (status?: string) => {
+    if (!status) return null;
+    const badge = STATUS_BADGE[status as CaseStatusValue];
+    if (!badge) return null;
+    return (
+      <span className={`text-xs ${badge.bg} ${badge.text} px-1.5 py-0.5 rounded shrink-0 ml-1`}>
+        {badge.label}
+      </span>
+    );
+  };
 
   const renderUsersList = () => (
     <div className="flex-1 overflow-y-auto">
@@ -304,34 +346,140 @@ export function CaseLibraryPanel() {
   );
 
   const renderUserPatients = () => (
-    <div className="flex-1 overflow-y-auto">
+    <div className={`flex-1 overflow-y-auto ${!isAdmin ? 'px-6 py-4' : ''}`}>
       {view.type === 'user-patients' && isAdmin && renderBackButton(view.userName)}
+
+      {/* Clinician status tabs */}
+      {view.type === 'user-patients' && !isAdmin && (
+        <div className="flex gap-1 mb-4">
+          {STATUS_TABS.map((tab) => {
+            const count = tabCounts[tab];
+            return (
+              <button
+                key={tab}
+                onClick={() => setStatusTab(tab)}
+                className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                  statusTab === tab
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+              >
+                {STATUS_TAB_LABELS[tab]}
+                {count > 0 && (
+                  <span className={`ml-1.5 text-xs rounded-full px-2 py-0.5 ${
+                    statusTab === tab ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-600'
+                  }`}>
+                    {count}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
       {isLoading && renderLoading()}
       {!isLoading && error && renderError()}
-      {!isLoading && !error && userPatients.length === 0 && renderEmpty('No patients assigned')}
+      {!isLoading && !error && filteredPatients.length === 0 && renderEmpty('No patients assigned')}
+      {!isLoading && !error && !isAdmin && filteredPatients.length > 0 && (
+        <div className="border rounded-lg overflow-hidden">
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50 text-left">
+              <tr>
+                <th className="px-4 py-2.5 font-medium text-gray-500 w-[200px]">Patient</th>
+                <th className="px-4 py-2.5 font-medium text-gray-500">Preview</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {filteredPatients.map((p) => {
+                const demo = [p.patientAge, p.patientSex].filter(Boolean).join(' ');
+                return (
+                  <tr
+                    key={p.patientFhirId}
+                    onClick={async () => {
+                      await handlePatientClick(p.patientFhirId, p.status);
+                      handleEncounterClick(p.patientFhirId, p.encounterFhirId, p.patientName);
+                    }}
+                    className="hover:bg-blue-50 cursor-pointer transition-colors"
+                  >
+                    <td className="px-4 py-3">
+                      <div className="font-medium text-gray-900">{p.patientName}</div>
+                      {demo && <div className="text-xs text-gray-500 mt-0.5">{demo}</div>}
+                    </td>
+                    <td className="px-4 py-3 text-gray-500 truncate max-w-[300px]">
+                      {p.notePreview || <span className="text-gray-300 italic">No notes yet</span>}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
       {!isLoading &&
         !error &&
-        userPatients.map((p) => (
-          <button
+        isAdmin &&
+        filteredPatients.map((p) => (
+          <div
             key={p.patientFhirId}
-            onClick={() =>
-              handleNavigate({
-                type: 'patient-encounters',
-                patientFhirId: p.patientFhirId,
-                patientName: p.patientName,
-              })
-            }
-            className="w-full text-left px-3 py-2 hover:bg-blue-50 border-b border-gray-100"
+            className="flex items-center border-b border-gray-100 hover:bg-blue-50"
           >
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-medium truncate">{p.patientName}</span>
-              {p.signedEncounterCount > 0 && (
-                <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded shrink-0 ml-2">
-                  {p.signedEncounterCount} signed
-                </span>
-              )}
-            </div>
-          </button>
+            <button
+              onClick={async () => {
+                await handlePatientClick(p.patientFhirId, p.status);
+                handleNavigate({
+                  type: 'patient-encounters',
+                  patientFhirId: p.patientFhirId,
+                  patientName: p.patientName,
+                });
+              }}
+              className="flex-1 text-left px-3 py-2 min-w-0"
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium truncate">{p.patientName}</span>
+                <div className="flex items-center shrink-0 ml-1">
+                  {p.signedEncounterCount > 0 && (
+                    <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded">
+                      {p.signedEncounterCount} signed
+                    </span>
+                  )}
+                </div>
+              </div>
+            </button>
+
+            {/* Admin action buttons */}
+            {isAdmin && (
+              <div className="flex items-center gap-0.5 pr-2">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setAssignTarget({
+                      patientFhirId: p.patientFhirId,
+                      patientName: p.patientName,
+                      encounterFhirId: p.encounterFhirId,
+                    });
+                  }}
+                  className="p-1 text-gray-400 hover:text-blue-600 rounded"
+                  title="Assign to clinicians"
+                >
+                  <UserPlus size={14} />
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setDuplicateTarget({
+                      patientFhirId: p.patientFhirId,
+                      patientName: p.patientName,
+                    });
+                  }}
+                  className="p-1 text-gray-400 hover:text-purple-600 rounded"
+                  title="Duplicate patient"
+                >
+                  <Copy size={14} />
+                </button>
+              </div>
+            )}
+          </div>
         ))}
     </div>
   );
@@ -349,13 +497,13 @@ export function CaseLibraryPanel() {
             key={e.encounterFhirId}
             onClick={() => {
               if (view.type === 'patient-encounters') {
-                handleEncounterClick(view.patientFhirId, e.encounterFhirId);
+                handleEncounterClick(view.patientFhirId, e.encounterFhirId, view.patientName);
               }
             }}
             className="w-full text-left px-3 py-2 hover:bg-blue-50 border-b border-gray-100"
           >
             <div className="text-sm font-medium">
-              {formatDate(e.date)} &middot; {e.classDisplay}
+              {formatDateTime(e.date)} &middot; {e.classDisplay}
             </div>
             {e.notePreview && (
               <div className="text-xs text-gray-400 truncate mt-0.5">{e.notePreview}</div>
@@ -375,13 +523,13 @@ export function CaseLibraryPanel() {
         activity.map((a) => (
           <button
             key={a.encounterFhirId}
-            onClick={() => handleEncounterClick(a.patientFhirId, a.encounterFhirId)}
+            onClick={() => handleEncounterClick(a.patientFhirId, a.encounterFhirId, a.patientName)}
             className="w-full text-left px-3 py-2 hover:bg-blue-50 border-b border-gray-100"
           >
             <div className="text-sm font-medium truncate">{a.patientName}</div>
             <div className="text-xs text-gray-500">{a.classDisplay}</div>
             <div className="text-xs text-gray-500">{a.signedBy || 'Unknown'}</div>
-            <div className="text-xs text-gray-400">{formatDate(a.signedAt)}</div>
+            <div className="text-xs text-gray-400">{formatDateTime(a.signedAt)}</div>
           </button>
         ))}
     </div>
@@ -401,9 +549,9 @@ export function CaseLibraryPanel() {
   };
 
   return (
-    <div className="w-72 border-r bg-white flex flex-col overflow-hidden">
+    <div className={`${isAdmin ? 'w-72 border-r' : 'flex-1'} bg-white flex flex-col overflow-hidden`}>
       {/* Header */}
-      <div className="px-3 py-2 border-b">
+      <div className={`px-3 py-2 border-b ${!isAdmin ? 'px-6' : ''}`}>
         {isAdmin ? (
           <div className="flex gap-1">
             <button
@@ -428,12 +576,35 @@ export function CaseLibraryPanel() {
             </button>
           </div>
         ) : (
-          <div className="text-sm font-medium text-gray-900 py-1.5">My Cases</div>
+          <div className="text-lg font-semibold text-gray-900 py-1.5">My Patients</div>
         )}
       </div>
 
       {/* Content */}
       {renderContent()}
+
+      {/* Dialogs */}
+      {assignTarget && (
+        <AssignCaseDialog
+          onClose={() => {
+            setAssignTarget(null);
+            fetchData(view);
+          }}
+          patientFhirId={assignTarget.patientFhirId}
+          patientName={assignTarget.patientName}
+          encounterFhirId={assignTarget.encounterFhirId}
+        />
+      )}
+      {duplicateTarget && (
+        <DuplicatePatientDialog
+          onClose={() => {
+            setDuplicateTarget(null);
+            fetchData(view);
+          }}
+          patientFhirId={duplicateTarget.patientFhirId}
+          patientName={duplicateTarget.patientName}
+        />
+      )}
     </div>
   );
 }
