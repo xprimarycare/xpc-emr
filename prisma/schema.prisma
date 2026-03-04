@@ -50,10 +50,16 @@ model Account {
 
 
 model UserPatient {
-  id            String   @id @default(cuid())
-  userId        String
-  patientFhirId String
-  assignedAt    DateTime @default(now())
+  id                    String   @id @default(cuid())
+  userId                String
+  patientFhirId         String
+  assignedAt            DateTime @default(now())
+  status                String   @default("waiting_room")
+  assignedBy            String?
+  encounterFhirId       String?
+  sourceEncounterFhirId String?
+  sourcePatientFhirId   String?
+  includeNoteText       Boolean  @default(true)
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
