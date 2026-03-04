@@ -15,7 +15,16 @@ export async function GET() {
 
     const assignments = await prisma.userPatient.findMany({
       where: { userId: session.user.id },
-      select: { patientFhirId: true, assignedAt: true },
+      select: {
+        patientFhirId: true,
+        assignedAt: true,
+        status: true,
+        assignedBy: true,
+        encounterFhirId: true,
+        sourceEncounterFhirId: true,
+        sourcePatientFhirId: true,
+        includeNoteText: true,
+      },
       orderBy: { assignedAt: "desc" },
     })
 
@@ -88,6 +97,67 @@ export async function POST(request: NextRequest) {
     console.error("Failed to assign patient:", error)
     return NextResponse.json(
       { error: "Failed to assign patient" },
+      { status: 500 }
+    )
+  }
+}
+
+// PATCH: Update assignment status (self-only, atomic transition)
+export async function PATCH(request: NextRequest) {
+  try {
+    const session = await auth()
+    if (!session?.user?.id) {
+      return NextResponse.json(
+        { error: "Authentication required" },
+        { status: 401 }
+      )
+    }
+
+    const { patientFhirId, status } = await request.json()
+
+    if (!patientFhirId?.trim()) {
+      return NextResponse.json(
+        { error: "patientFhirId is required" },
+        { status: 400 }
+      )
+    }
+
+    // Determine which current status(es) can transition to the requested status
+    const validFrom: Record<string, string> = {
+      in_progress: "waiting_room",
+      completed: "in_progress",
+    }
+
+    const requiredCurrentStatus = validFrom[status]
+    if (!requiredCurrentStatus) {
+      return NextResponse.json(
+        { error: `Invalid target status: ${status}` },
+        { status: 400 }
+      )
+    }
+
+    // Atomic conditional update — avoids TOCTOU race
+    const result = await prisma.userPatient.updateMany({
+      where: {
+        userId: session.user.id,
+        patientFhirId: patientFhirId.trim(),
+        status: requiredCurrentStatus,
+      },
+      data: { status },
+    })
+
+    if (result.count === 0) {
+      return NextResponse.json(
+        { error: "Assignment not found or transition not allowed" },
+        { status: 400 }
+      )
+    }
+
+    return NextResponse.json({ success: true })
+  } catch (error) {
+    console.error("Failed to update assignment status:", error)
+    return NextResponse.json(
+      { error: "Failed to update assignment status" },
       { status: 500 }
     )
   }
