@@ -34,7 +34,10 @@ function StructuredPlaceholder() {
 
 export function EditorContainer() {
   const { activePatient, updateTabProperties } = usePatient();
-  const { activeTabId } = useEditor();
+  const { activeTabId, leftPanelMode } = useEditor();
+
+  // Hide editor when case library is shown as full page (clinician view)
+  if (leftPanelMode === 'caseLibrary') return null;
 
   const activeTab = activePatient?.tabs.find(t => t.id === activeTabId);
 
