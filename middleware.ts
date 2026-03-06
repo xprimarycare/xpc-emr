@@ -10,6 +10,7 @@ export default auth((req) => {
   // Allow public routes
   if (
     pathname.startsWith("/login") ||
+    pathname.startsWith("/register") ||
     pathname.startsWith("/api/auth")
   ) {
     return NextResponse.next()

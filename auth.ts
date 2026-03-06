@@ -1,6 +1,10 @@
 import NextAuth from "next-auth"
 import { PrismaAdapter } from "@auth/prisma-adapter"
+import Google from "next-auth/providers/google"
+import Credentials from "next-auth/providers/credentials"
+import bcrypt from "bcryptjs"
 import { prisma } from "@/lib/prisma"
+import { rateLimit } from "@/lib/rate-limit"
 import authConfig from "./auth.config"
 
 declare module "next-auth" {
@@ -31,6 +35,50 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   ...authConfig,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   adapter: PrismaAdapter(prisma) as any,
+  // Override providers to add real Credentials authorize with DB access
+  providers: [
+    Google({
+      clientId: process.env.AUTH_GOOGLE_ID,
+      clientSecret: process.env.AUTH_GOOGLE_SECRET,
+    }),
+    Credentials({
+      credentials: {
+        email: { label: "Email", type: "email" },
+        password: { label: "Password", type: "password" },
+      },
+      async authorize(credentials) {
+        const email = credentials?.email as string | undefined
+        const password = credentials?.password as string | undefined
+        if (!email || !password) return null
+
+        const normalizedEmail = email.toLowerCase().trim()
+        const { success } = rateLimit(`login:${normalizedEmail}`, {
+          maxRequests: 10,
+          windowMs: 60_000,
+        })
+        if (!success) return null
+
+        const user = await prisma.user.findUnique({
+          where: { email: email.toLowerCase().trim() },
+        })
+        if (!user?.hashedPassword) return null
+
+        const isValid = await bcrypt.compare(password, user.hashedPassword)
+        if (!isValid) return null
+
+        return {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          image: user.image,
+          institution: user.institution,
+          npi: user.npi,
+          fhirPractitionerId: user.fhirPractitionerId,
+          onboardingComplete: user.onboardingComplete,
+        }
+      },
+    }),
+  ],
   session: {
     strategy: "jwt",
   },
