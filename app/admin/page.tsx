@@ -42,6 +42,12 @@ export default async function AdminPage() {
           >
             Case Assignments &rarr;
           </Link>
+          <Link
+            href="/admin/patients"
+            className="block text-sm text-blue-600 hover:text-blue-800 font-medium"
+          >
+            Patient Library &rarr;
+          </Link>
         </div>
       </div>
     </div>
