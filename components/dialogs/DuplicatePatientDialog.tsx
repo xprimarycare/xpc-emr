@@ -2,17 +2,7 @@
 
 import React, { useState } from 'react';
 import { Dialog } from '@/components/ui/dialog';
-
-const RESOURCE_TYPES = [
-  { key: 'conditions', label: 'Conditions' },
-  { key: 'medications', label: 'Medications' },
-  { key: 'allergies', label: 'Allergies' },
-  { key: 'careTeam', label: 'Care Team' },
-  { key: 'familyHistory', label: 'Family History' },
-  { key: 'socialHistory', label: 'Social History' },
-  { key: 'vitals', label: 'Vitals' },
-  { key: 'labs', label: 'Labs' },
-];
+import { CLONEABLE_RESOURCE_TYPES } from '@/lib/data/cloneable-resource-types';
 
 interface DuplicateResult {
   newPatientFhirId?: string;
@@ -32,7 +22,7 @@ export function DuplicatePatientDialog({
   patientName,
 }: DuplicatePatientDialogProps) {
   const [selectedTypes, setSelectedTypes] = useState<Set<string>>(
-    new Set(RESOURCE_TYPES.map((t) => t.key))
+    new Set(CLONEABLE_RESOURCE_TYPES.map((t) => t.key))
   );
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<DuplicateResult | null>(null);
@@ -84,7 +74,7 @@ export function DuplicatePatientDialog({
             )}
             {Object.entries(result.clonedCounts).map(([type, count]) => (
               <div key={type} className="text-sm text-gray-600 px-2">
-                {RESOURCE_TYPES.find((t) => t.key === type)?.label || type}:{' '}
+                {CLONEABLE_RESOURCE_TYPES.find((t) => t.key === type)?.label || type}:{' '}
                 {count} cloned
               </div>
             ))}
@@ -113,7 +103,7 @@ export function DuplicatePatientDialog({
                 Select resource types to clone
               </div>
               <div className="border rounded divide-y">
-                {RESOURCE_TYPES.map((rt) => (
+                {CLONEABLE_RESOURCE_TYPES.map((rt) => (
                   <label
                     key={rt.key}
                     className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer"
