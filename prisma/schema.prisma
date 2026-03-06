@@ -66,3 +66,16 @@ model UserPatient {
   @@unique([userId, patientFhirId])
   @@map("user_patients")
 }
+
+model PatientTag {
+  id            String @id @default(cuid())
+  patientFhirId String
+  category      String // 'conditions' | 'competencies' | 'contexts'
+  value         String
+
+  createdAt DateTime @default(now())
+
+  @@unique([patientFhirId, category, value])
+  @@index([patientFhirId])
+  @@map("patient_tags")
+}
