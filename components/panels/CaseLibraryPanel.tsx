@@ -549,7 +549,7 @@ export function CaseLibraryPanel() {
   };
 
   return (
-    <div className={`${isAdmin ? 'w-72 border-r' : 'flex-1'} bg-white flex flex-col overflow-hidden`}>
+    <div className="flex-1 border-r bg-white flex flex-col overflow-hidden">
       {/* Header */}
       <div className={`px-3 py-2 border-b ${!isAdmin ? 'px-6' : ''}`}>
         {isAdmin ? (
