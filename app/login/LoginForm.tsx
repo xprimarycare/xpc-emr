@@ -3,6 +3,8 @@
 import { signIn } from 'next-auth/react'
 import { Button } from '@/components/ui/button'
 import { useSearchParams } from 'next/navigation'
+import { useState } from 'react'
+import Link from 'next/link'
 
 export function LoginForm() {
   const searchParams = useSearchParams()
@@ -15,15 +17,42 @@ export function LoginForm() {
       return '/'
     }
   })()
-  const error = searchParams.get('error')
+  const urlError = searchParams.get('error')
+
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
+  const [credentialsError, setCredentialsError] = useState('')
+
+  const handleCredentialsSignIn = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setIsLoading(true)
+    setCredentialsError('')
+    const result = await signIn('credentials', { email, password, redirect: false })
+    if (result?.error) {
+      setCredentialsError('Invalid email or password.')
+      setIsLoading(false)
+    } else {
+      window.location.href = callbackUrl
+    }
+  }
+
+  const errorMessage = (() => {
+    if (credentialsError) return credentialsError
+    if (!urlError) return null
+    if (urlError === 'OAuthAccountNotLinked')
+      return 'This email is already associated with another account.'
+    if (urlError === 'CredentialsSignin')
+      return 'Invalid email or password.'
+    return 'An error occurred during sign in. Please try again.'
+  })()
 
   return (
     <div className="space-y-6">
-      {error && (
+      {errorMessage && (
         <div className="p-3 rounded-md bg-red-50 text-red-700 text-sm">
-          {error === 'OAuthAccountNotLinked'
-            ? 'This email is already associated with another account.'
-            : 'An error occurred during sign in. Please try again.'}
+          {errorMessage}
         </div>
       )}
       <Button
@@ -36,6 +65,58 @@ export function LoginForm() {
       </Button>
       <p className="text-xs text-center text-gray-400">
         Sign in with your institutional Google account to access patient records.
+      </p>
+
+      <div className="relative">
+        <div className="absolute inset-0 flex items-center">
+          <div className="w-full border-t border-gray-200" />
+        </div>
+        <div className="relative flex justify-center text-xs">
+          <span className="bg-white px-2 text-gray-400">or</span>
+        </div>
+      </div>
+
+      <form onSubmit={handleCredentialsSignIn} className="space-y-3">
+        <input
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder="Email"
+          required
+          className="w-full px-3 py-2 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+        />
+        <div className="relative">
+          <input
+            type={showPassword ? 'text' : 'password'}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="Password"
+            required
+            className="w-full px-3 py-2 pr-10 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+          <button
+            type="button"
+            onClick={() => setShowPassword(!showPassword)}
+            className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-xs"
+          >
+            {showPassword ? 'Hide' : 'Show'}
+          </button>
+        </div>
+        <Button
+          type="submit"
+          variant="ghost"
+          disabled={isLoading}
+          className="w-full text-sm text-gray-500 cursor-pointer"
+        >
+          {isLoading ? 'Signing in...' : 'Sign in with email'}
+        </Button>
+      </form>
+
+      <p className="text-xs text-center text-gray-400">
+        Don&apos;t have an account?{' '}
+        <Link href="/register" className="text-blue-500 hover:underline">
+          Register
+        </Link>
       </p>
     </div>
   )
