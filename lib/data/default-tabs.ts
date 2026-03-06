@@ -1,5 +1,9 @@
 import { Tab } from '../types/patient';
 
+// When adding a new page here, also add a corresponding entry in
+// ./cloneable-resource-types.ts so it appears in the Duplicate Patient
+// dialog and is handled by the clone service.
+
 function buildPatientInfoContent(patient: {
   name: string;
   mrn: string;

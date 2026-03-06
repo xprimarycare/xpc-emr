@@ -1,32 +1,20 @@
 import { phenomlClient } from "@/lib/phenoml/client";
+import { CLONEABLE_RESOURCE_TYPES } from "@/lib/data/cloneable-resource-types";
 
 const providerId = process.env.PHENOML_FHIR_PROVIDER_ID;
 
 const ENCOUNTER_SIGNATURE_EXT =
   "http://phenoml.com/fhir/StructureDefinition/encounter-signature";
 
-// Resource type → FHIR resource name and search parameter for patient reference
+// Build RESOURCE_TYPE_MAP from the shared definition (excludes special-cased types like "encounters")
 const RESOURCE_TYPE_MAP: Record<
   string,
   { resourceType: string; searchParam: string; extraParams?: Record<string, string> }
-> = {
-  conditions: { resourceType: "Condition", searchParam: "subject" },
-  medications: { resourceType: "MedicationRequest", searchParam: "subject" },
-  allergies: { resourceType: "AllergyIntolerance", searchParam: "patient" },
-  careTeam: { resourceType: "CareTeam", searchParam: "subject" },
-  familyHistory: { resourceType: "FamilyMemberHistory", searchParam: "patient" },
-  socialHistory: {
-    resourceType: "Observation",
-    searchParam: "subject",
-    extraParams: { category: "social-history" },
-  },
-  vitals: {
-    resourceType: "Observation",
-    searchParam: "subject",
-    extraParams: { category: "vital-signs" },
-  },
-  labs: { resourceType: "ServiceRequest", searchParam: "subject" },
-};
+> = Object.fromEntries(
+  CLONEABLE_RESOURCE_TYPES
+    .filter((rt) => rt.fhir)
+    .map((rt) => [rt.key, rt.fhir!])
+);
 
 export interface CloneEncounterOptions {
   sourcePatientFhirId: string;
@@ -169,9 +157,13 @@ export async function clonePatient(
       return { errors: ["Failed to create cloned patient"], clonedCounts };
     }
 
-    // Clone each selected resource type in parallel
+    // Separate encounters (special handling) from normal resource types
+    const normalTypes = options.resourceTypes.filter((t) => t !== "encounters");
+    const includeEncounters = options.resourceTypes.includes("encounters");
+
+    // Clone normal resource types in parallel
     await Promise.all(
-      options.resourceTypes.map(async (typeKey) => {
+      normalTypes.map(async (typeKey) => {
         const mapping = RESOURCE_TYPE_MAP[typeKey];
         if (!mapping) {
           errors.push(`Unknown resource type: ${typeKey}`);
@@ -195,14 +187,12 @@ export async function clonePatient(
             .map((e: any) => e.resource)
             .filter(Boolean);
 
-          // Create cloned resources in parallel
           const created = await Promise.all(
             entries.map(async (resource: any) => {
               const cloned = JSON.parse(JSON.stringify(resource));
               delete cloned.id;
               delete cloned.meta;
 
-              // Update patient references
               if (cloned.subject?.reference) {
                 cloned.subject.reference = `Patient/${newPatientFhirId}`;
               }
@@ -224,6 +214,74 @@ export async function clonePatient(
         }
       })
     );
+
+    // Clone encounters (+ their ClinicalImpressions) if selected
+    if (includeEncounters) {
+      try {
+        const encBundle = await phenomlClient.fhir.search(providerId!, "Encounter", {}, {
+          queryParams: {
+            subject: `Patient/${options.sourcePatientFhirId}`,
+            _count: "200",
+          },
+        });
+        const encounters = ((encBundle as any)?.entry || [])
+          .map((e: any) => e.resource)
+          .filter(Boolean);
+
+        let encounterCount = 0;
+        for (const sourceEnc of encounters) {
+          const clonedEnc = JSON.parse(JSON.stringify(sourceEnc));
+          delete clonedEnc.id;
+          delete clonedEnc.meta;
+          clonedEnc.status = "planned";
+          clonedEnc.subject = { reference: `Patient/${newPatientFhirId}` };
+          clonedEnc.extension = (clonedEnc.extension || []).filter(
+            (ext: any) => ext.url !== ENCOUNTER_SIGNATURE_EXT
+          );
+          if (clonedEnc.extension.length === 0) delete clonedEnc.extension;
+
+          const newEnc = (await phenomlClient.fhir.create(providerId!, "Encounter", {
+            body: clonedEnc,
+          })) as any;
+          if (!newEnc?.id) continue;
+          encounterCount++;
+
+          // Clone ClinicalImpressions for this encounter
+          const ciBundle = await phenomlClient.fhir.search(
+            providerId!,
+            "ClinicalImpression",
+            {},
+            {
+              queryParams: {
+                subject: `Patient/${options.sourcePatientFhirId}`,
+                encounter: `Encounter/${sourceEnc.id}`,
+                _count: "100",
+              },
+            }
+          );
+          const impressions = ((ciBundle as any)?.entry || [])
+            .map((e: any) => e.resource)
+            .filter(Boolean);
+
+          for (const sourceCI of impressions) {
+            const clonedCI = JSON.parse(JSON.stringify(sourceCI));
+            delete clonedCI.id;
+            delete clonedCI.meta;
+            clonedCI.status = "in-progress";
+            clonedCI.subject = { reference: `Patient/${newPatientFhirId}` };
+            clonedCI.encounter = { reference: `Encounter/${newEnc.id}` };
+            await phenomlClient.fhir.create(providerId!, "ClinicalImpression", {
+              body: clonedCI,
+            });
+          }
+        }
+        clonedCounts["encounters"] = encounterCount;
+      } catch (err) {
+        errors.push(
+          `Failed to clone encounters: ${err instanceof Error ? err.message : "unknown error"}`
+        );
+      }
+    }
 
     return { newPatientFhirId, clonedCounts, errors };
   } catch (error) {
