@@ -3,9 +3,15 @@ import { PrismaAdapter } from "@auth/prisma-adapter"
 import Google from "next-auth/providers/google"
 import Credentials from "next-auth/providers/credentials"
 import bcrypt from "bcryptjs"
+import { z } from "zod"
 import { prisma } from "@/lib/prisma"
 import { rateLimit } from "@/lib/rate-limit"
 import authConfig from "./auth.config"
+
+const credentialsSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(1),
+})
 
 declare module "next-auth" {
   interface Session {
@@ -47,11 +53,11 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         password: { label: "Password", type: "password" },
       },
       async authorize(credentials) {
-        const email = credentials?.email as string | undefined
-        const password = credentials?.password as string | undefined
-        if (!email || !password) return null
+        const parsed = credentialsSchema.safeParse(credentials)
+        if (!parsed.success) return null
 
-        const normalizedEmail = email.toLowerCase().trim()
+        const normalizedEmail = parsed.data.email.toLowerCase().trim()
+        const password = parsed.data.password
         const { success } = rateLimit(`login:${normalizedEmail}`, {
           maxRequests: 10,
           windowMs: 60_000,
@@ -59,7 +65,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         if (!success) return null
 
         const user = await prisma.user.findUnique({
-          where: { email: email.toLowerCase().trim() },
+          where: { email: normalizedEmail },
         })
         if (!user?.hashedPassword) return null
 

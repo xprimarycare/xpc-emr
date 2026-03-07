@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { signIn } from 'next-auth/react'
 import { Button } from '@/components/ui/button'
+import { register } from './actions'
 import Link from 'next/link'
 
 export function RegisterForm() {
@@ -19,27 +20,22 @@ export function RegisterForm() {
     setError('')
 
     try {
-      const response = await fetch('/api/auth/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: name.trim(),
-          email: email.trim(),
-          password,
-        }),
+      const result = await register({
+        name: name.trim(),
+        email: email.trim(),
+        password,
       })
 
-      if (!response.ok) {
-        const data = await response.json()
-        throw new Error(data.error || 'Registration failed')
+      if ('error' in result) {
+        throw new Error(result.error)
       }
 
-      const result = await signIn('credentials', {
+      const signInResult = await signIn('credentials', {
         email: email.trim(),
         password,
         redirect: false,
       })
-      if (result?.error) {
+      if (signInResult?.error) {
         setError('Account created but sign-in failed. Please sign in manually.')
         setIsLoading(false)
       } else {
