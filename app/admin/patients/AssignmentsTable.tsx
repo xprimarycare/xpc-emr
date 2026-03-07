@@ -34,15 +34,6 @@ interface AssignmentData {
 // Constants
 // ---------------------------------------------------------------------------
 
-const COL_LABELS: Record<string, string> = {
-  patient: 'Patient',
-  condition: 'Condition',
-  clinician: 'Clinician',
-  status: 'Status',
-  date: 'Assigned',
-  by: 'Assigned By',
-};
-
 const COLS = ['patient', 'condition', 'clinician', 'status', 'date', 'by'] as const;
 type ColKey = (typeof COLS)[number];
 
@@ -62,6 +53,8 @@ const COL_DEFS: { col: ColKey; label: string; alignRight?: boolean }[] = [
   { col: 'date', label: 'Assigned', alignRight: true },
   { col: 'by', label: 'Assigned By', alignRight: true },
 ];
+
+const COL_LABELS: Record<ColKey, string> = Object.fromEntries(COL_DEFS.map((d) => [d.col, d.label])) as Record<ColKey, string>;
 
 // ---------------------------------------------------------------------------
 // ColumnFilter component

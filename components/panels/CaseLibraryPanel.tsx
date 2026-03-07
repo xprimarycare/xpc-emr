@@ -7,7 +7,7 @@ import { useAuth } from '@/lib/context/AuthContext';
 import { usePatient } from '@/lib/context/PatientContext';
 import { AssignCaseDialog } from '@/components/dialogs/AssignCaseDialog';
 import { DuplicatePatientDialog } from '@/components/dialogs/DuplicatePatientDialog';
-import { STATUS_BADGE, CaseStatus, formatDateTime } from '@/lib/constants/case-status';
+import { STATUS_BADGE, CaseStatus, STATUS_ORDER, formatDateTime } from '@/lib/constants/case-status';
 import type { CaseStatusValue } from '@/lib/constants/case-status';
 import { createDefaultTabs } from '@/lib/data/default-tabs';
 import { PatientLibrary } from '@/app/admin/patients/PatientLibrary';
@@ -152,12 +152,6 @@ export function CaseLibraryPanel() {
   }, [view, leftPanelMode, fetchData]);
 
   const [statusSort, setStatusSort] = useState<'asc' | 'desc' | null>(null);
-
-  const STATUS_ORDER: Record<string, number> = {
-    [CaseStatus.WAITING_ROOM]: 0,
-    [CaseStatus.IN_PROGRESS]: 1,
-    [CaseStatus.COMPLETED]: 2,
-  };
 
   const filteredPatients = useMemo(() => {
     if (!statusSort) return userPatients;
