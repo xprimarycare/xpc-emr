@@ -1,6 +1,7 @@
 import { auth } from "@/auth"
 import { prisma } from "@/lib/prisma"
 import { NextRequest, NextResponse } from "next/server"
+import { CaseStatus, VALID_STATUS_TRANSITIONS } from "@/lib/constants/case-status"
 
 // GET: List current user's assigned patient FHIR IDs
 export async function GET() {
@@ -122,16 +123,21 @@ export async function PATCH(request: NextRequest) {
       )
     }
 
-    // Determine which current status(es) can transition to the requested status
-    const validFrom: Record<string, string> = {
-      in_progress: "waiting_room",
-      completed: "in_progress",
-    }
-
-    const requiredCurrentStatus = validFrom[status]
-    if (!requiredCurrentStatus) {
+    // Validate and determine which current status can transition to the requested status
+    if (!Object.values(CaseStatus).includes(status)) {
       return NextResponse.json(
         { error: `Invalid target status: ${status}` },
+        { status: 400 }
+      )
+    }
+
+    const requiredCurrentStatus = Object.entries(VALID_STATUS_TRANSITIONS).find(
+      ([, allowed]) => allowed.includes(status)
+    )?.[0]
+
+    if (!requiredCurrentStatus) {
+      return NextResponse.json(
+        { error: `No valid transition to status: ${status}` },
         { status: 400 }
       )
     }
