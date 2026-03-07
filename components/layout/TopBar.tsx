@@ -26,11 +26,15 @@ export function TopBar() {
 
   const handleExitImpersonation = async () => {
     try {
-      await fetch('/api/admin/impersonate', {
+      const res = await fetch('/api/admin/impersonate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId: null }),
       })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.error || `Server error ${res.status}`)
+      }
       // Signal the JWT callback to restore admin identity
       await update({ stopImpersonating: true })
       router.push('/admin')
