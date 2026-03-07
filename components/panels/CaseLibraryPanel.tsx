@@ -10,6 +10,7 @@ import { DuplicatePatientDialog } from '@/components/dialogs/DuplicatePatientDia
 import { STATUS_BADGE, STATUS_TAB_LABELS, CaseStatus, formatDateTime } from '@/lib/constants/case-status';
 import type { CaseStatusValue } from '@/lib/constants/case-status';
 import { createDefaultTabs } from '@/lib/data/default-tabs';
+import { PatientLibrary } from '@/app/admin/patients/PatientLibrary';
 
 type CaseLibraryView =
   | { type: 'users' }
@@ -160,14 +161,20 @@ export function CaseLibraryPanel() {
       const s = (p.status || CaseStatus.WAITING_ROOM) as CaseStatusValue;
       if (s in counts) counts[s]++;
     }
-    const filtered = !isAdmin
-      ? userPatients.filter((p) => (p.status || CaseStatus.WAITING_ROOM) === statusTab)
-      : userPatients;
+    const filtered = userPatients;
     return { filteredPatients: filtered, tabCounts: counts };
   }, [isAdmin, userPatients, statusTab]);
 
   if (leftPanelMode !== 'caseLibrary') {
     return null;
+  }
+
+  if (isAdmin) {
+    return (
+      <div className="flex-1 border-r bg-white overflow-y-auto">
+        <PatientLibrary asPanel />
+      </div>
+    );
   }
 
   const handleNavigate = (nextView: CaseLibraryView) => {
@@ -349,36 +356,7 @@ export function CaseLibraryPanel() {
     <div className={`flex-1 overflow-y-auto ${!isAdmin ? 'px-6 py-4' : ''}`}>
       {view.type === 'user-patients' && isAdmin && renderBackButton(view.userName)}
 
-      {/* Clinician status tabs */}
-      {view.type === 'user-patients' && !isAdmin && (
-        <div className="flex gap-1 mb-4">
-          {STATUS_TABS.map((tab) => {
-            const count = tabCounts[tab];
-            return (
-              <button
-                key={tab}
-                onClick={() => setStatusTab(tab)}
-                className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
-                  statusTab === tab
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                }`}
-              >
-                {STATUS_TAB_LABELS[tab]}
-                {count > 0 && (
-                  <span className={`ml-1.5 text-xs rounded-full px-2 py-0.5 ${
-                    statusTab === tab ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-600'
-                  }`}>
-                    {count}
-                  </span>
-                )}
-              </button>
-            );
-          })}
-        </div>
-      )}
-
-      {isLoading && renderLoading()}
+{isLoading && renderLoading()}
       {!isLoading && error && renderError()}
       {!isLoading && !error && filteredPatients.length === 0 && renderEmpty('No patients assigned')}
       {!isLoading && !error && !isAdmin && filteredPatients.length > 0 && (
@@ -386,28 +364,35 @@ export function CaseLibraryPanel() {
           <table className="w-full text-sm">
             <thead className="bg-gray-50 text-left">
               <tr>
-                <th className="px-4 py-2.5 font-medium text-gray-500 w-[200px]">Patient</th>
+                <th className="px-4 py-2.5 font-medium text-gray-500 w-[160px]">Patient</th>
                 <th className="px-4 py-2.5 font-medium text-gray-500">Preview</th>
+                <th className="px-4 py-2.5 font-medium text-gray-500 w-[64px]"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {filteredPatients.map((p) => {
                 const demo = [p.patientAge, p.patientSex].filter(Boolean).join(' ');
                 return (
-                  <tr
-                    key={p.patientFhirId}
-                    onClick={async () => {
-                      await handlePatientClick(p.patientFhirId, p.status);
-                      handleEncounterClick(p.patientFhirId, p.encounterFhirId, p.patientName);
-                    }}
-                    className="hover:bg-blue-50 cursor-pointer transition-colors"
-                  >
+                  <tr key={p.patientFhirId} className="hover:bg-gray-50 transition-colors">
                     <td className="px-4 py-3">
                       <div className="font-medium text-gray-900">{p.patientName}</div>
                       {demo && <div className="text-xs text-gray-500 mt-0.5">{demo}</div>}
                     </td>
-                    <td className="px-4 py-3 text-gray-500 truncate max-w-[300px]">
-                      {p.notePreview || <span className="text-gray-300 italic">No notes yet</span>}
+                    <td className="px-4 py-3 text-xs text-gray-500 max-w-[200px]">
+                      <div className="line-clamp-2">
+                        {p.notePreview || <span className="text-gray-300 italic">No notes yet</span>}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <button
+                        onClick={async () => {
+                          await handlePatientClick(p.patientFhirId, p.status);
+                          handleEncounterClick(p.patientFhirId, p.encounterFhirId, p.patientName);
+                        }}
+                        className="px-3 py-1.5 text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-md whitespace-nowrap"
+                      >
+                        Start
+                      </button>
                     </td>
                   </tr>
                 );
