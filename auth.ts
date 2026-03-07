@@ -81,6 +81,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           npi: user.npi,
           fhirPractitionerId: user.fhirPractitionerId,
           onboardingComplete: user.onboardingComplete,
+          role: user.role,
         }
       },
     }),

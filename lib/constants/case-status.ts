@@ -18,6 +18,12 @@ export const STATUS_TAB_LABELS: Record<CaseStatusValue, string> = {
   [CaseStatus.COMPLETED]: 'Completed',
 };
 
+export const STATUS_ORDER: Record<string, number> = {
+  [CaseStatus.WAITING_ROOM]: 0,
+  [CaseStatus.IN_PROGRESS]: 1,
+  [CaseStatus.COMPLETED]: 2,
+};
+
 export const VALID_STATUS_TRANSITIONS: Record<string, string[]> = {
   [CaseStatus.WAITING_ROOM]: [CaseStatus.IN_PROGRESS],
   [CaseStatus.IN_PROGRESS]: [CaseStatus.COMPLETED],
