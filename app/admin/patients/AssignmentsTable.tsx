@@ -256,7 +256,7 @@ function ColumnFilter({
 // AssignmentsTable
 // ---------------------------------------------------------------------------
 
-export function AssignmentsTable() {
+export function AssignmentsTable({ onOpen }: { onOpen?: (patientFhirId: string, patientName: string) => void }) {
   const [rows, setRows] = useState<AssignmentRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -434,8 +434,17 @@ export function AssignmentsTable() {
             <tbody className="divide-y divide-gray-100">
               {filteredRows.map((row) => (
                 <tr key={row.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-3 font-medium text-gray-900 whitespace-nowrap">
-                    {row.patient}
+                  <td className="px-6 py-3 font-medium whitespace-nowrap">
+                    {onOpen ? (
+                      <button
+                        onClick={() => onOpen(row.patientFhirId, row.patient)}
+                        className="text-indigo-600 hover:text-indigo-800 hover:underline text-left"
+                      >
+                        {row.patient}
+                      </button>
+                    ) : (
+                      <span className="text-gray-900">{row.patient}</span>
+                    )}
                   </td>
                   <td className="px-6 py-3 text-gray-500">{row.condition}</td>
                   <td className="px-6 py-3 text-gray-600">{row.clinician}</td>
