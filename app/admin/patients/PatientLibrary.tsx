@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Search, UserPlus, Copy, X } from 'lucide-react';
 import { AssignCaseDialog } from '@/components/dialogs/AssignCaseDialog';
 import { DuplicatePatientDialog } from '@/components/dialogs/DuplicatePatientDialog';
+import { AssignmentsTable } from './AssignmentsTable';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -138,7 +139,10 @@ function parseFhirBundle(bundle: any): FhirPatientRow[] {
 // Component
 // ---------------------------------------------------------------------------
 
-export function PatientLibrary() {
+export function PatientLibrary({ asPanel = false }: { asPanel?: boolean }) {
+  // Tabs
+  const [activeTab, setActiveTab] = useState<'cases' | 'assignments'>('cases');
+
   // Data
   const [patients, setPatients] = useState<FhirPatientRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -259,7 +263,7 @@ export function PatientLibrary() {
   // ---------------------------------------------------------------------------
 
   return (
-    <div className="bg-white rounded-lg border overflow-hidden">
+    <div className={asPanel ? '' : 'bg-white rounded-lg border overflow-hidden'}>
       {/* Header */}
       <div className="px-6 pt-6 pb-4">
         <h1 className="text-xl font-semibold text-gray-900">
@@ -270,38 +274,64 @@ export function PatientLibrary() {
         </p>
       </div>
 
+      {/* Tabs */}
+      <div className="px-6 border-b border-gray-200 flex items-center gap-6">
+        <button
+          onClick={() => setActiveTab('cases')}
+          className={`-mb-px py-3 text-sm font-medium border-b-2 transition-colors ${
+            activeTab === 'cases'
+              ? 'text-gray-900 border-gray-900'
+              : 'text-gray-400 border-transparent hover:text-gray-600'
+          }`}
+        >
+          Cases
+        </button>
+        <button
+          onClick={() => setActiveTab('assignments')}
+          className={`-mb-px py-3 text-sm font-medium border-b-2 transition-colors ${
+            activeTab === 'assignments'
+              ? 'text-gray-900 border-gray-900'
+              : 'text-gray-400 border-transparent hover:text-gray-600'
+          }`}
+        >
+          Assignments
+        </button>
+      </div>
+
+      {/* Assignments tab */}
+      {activeTab === 'assignments' && <AssignmentsTable />}
+
+      {/* Cases tab content */}
+      {activeTab === 'cases' && <>
+
       {/* Search bar + Assign Selected */}
-      <div className="bg-indigo-50 px-6 py-4 border-y border-indigo-100">
-        <div className="flex items-center gap-3">
-          <div className="relative flex-grow">
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search patients by name..."
-              className="w-full px-4 py-2.5 pr-10 border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 rounded-lg shadow-sm text-sm"
-            />
-            <div className="absolute inset-y-0 right-0 flex items-center pr-3">
-              <Search className="h-4 w-4 text-indigo-600" />
-            </div>
-          </div>
-          <button
-            disabled={selectedIds.size === 0}
-            onClick={() => {
-              const first = patients.find((p) => selectedIds.has(p.fhirId));
-              if (first) {
-                setAssignTarget({
-                  patientFhirId: first.fhirId,
-                  patientName: first.name,
-                });
-              }
-            }}
-            className="flex-shrink-0 flex items-center text-sm px-4 py-2.5 font-medium text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg shadow-sm"
-          >
-            <UserPlus className="h-4 w-4 mr-1.5" />
-            Assign{selectedIds.size > 0 ? ` (${selectedIds.size})` : ''}
-          </button>
+      <div className="px-6 pt-4 pb-4 flex items-center gap-3">
+        <div className="relative flex-grow">
+          <Search className="absolute inset-y-0 left-3 my-auto h-4 w-4 text-gray-400 pointer-events-none" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search patients by name..."
+            className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-md text-sm focus:outline-none focus:border-gray-400 bg-white"
+          />
         </div>
+        <button
+          disabled={selectedIds.size === 0}
+          onClick={() => {
+            const first = patients.find((p) => selectedIds.has(p.fhirId));
+            if (first) {
+              setAssignTarget({
+                patientFhirId: first.fhirId,
+                patientName: first.name,
+              });
+            }
+          }}
+          className="flex-shrink-0 flex items-center gap-1.5 text-sm px-3 py-2 font-medium text-gray-700 border border-gray-200 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed rounded-md bg-white"
+        >
+          <UserPlus className="h-4 w-4" />
+          Assign{selectedIds.size > 0 ? ` (${selectedIds.size})` : ''}
+        </button>
       </div>
 
       {/* Data Table */}
@@ -551,6 +581,7 @@ export function PatientLibrary() {
           </div>
         </div>
       )}
+      </> /* end cases tab */}
     </div>
   );
 }
