@@ -32,23 +32,6 @@ export default auth((req) => {
     return NextResponse.redirect(loginUrl)
   }
 
-  // Check onboarding completion
-  const user = req.auth.user as Record<string, unknown>
-  if (
-    !user?.onboardingComplete &&
-    !pathname.startsWith("/onboarding") &&
-    !pathname.startsWith("/api/auth") &&
-    !pathname.startsWith("/api/user/onboarding")
-  ) {
-    if (pathname.startsWith("/api/")) {
-      return NextResponse.json(
-        { error: "Onboarding not complete" },
-        { status: 403 }
-      )
-    }
-    return NextResponse.redirect(new URL("/onboarding", req.url))
-  }
-
   return NextResponse.next()
 })
 
