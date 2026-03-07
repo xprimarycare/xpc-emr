@@ -59,6 +59,11 @@ async function fetchPatientName(patientFhirId: string): Promise<string> {
   return (await fetchPatientInfo(patientFhirId)).name;
 }
 
+function sortBySignedAtDesc<T extends { signedAt?: string }>(a: T, b: T): number {
+  return (b.signedAt ? new Date(b.signedAt).getTime() : 0) -
+         (a.signedAt ? new Date(a.signedAt).getTime() : 0);
+}
+
 // GET /api/case-library?view=...
 export async function GET(request: NextRequest) {
   const authResult = await requireAuth();
@@ -246,11 +251,7 @@ export async function GET(request: NextRequest) {
       const encounters = await fetchPatientEncounters(patientFhirId);
       const signed = encounters
         .filter((e) => e.isSigned)
-        .sort((a, b) => {
-          const da = a.signedAt ? new Date(a.signedAt).getTime() : 0;
-          const db = b.signedAt ? new Date(b.signedAt).getTime() : 0;
-          return db - da;
-        })
+        .sort(sortBySignedAtDesc)
         .map((e) => ({
           encounterFhirId: e.encounterFhirId,
           date: e.date,
@@ -271,10 +272,12 @@ export async function GET(request: NextRequest) {
 
       const allAssignments = await prisma.userPatient.findMany({
         select: { patientFhirId: true },
+        orderBy: { assignedAt: "desc" },
+        take: 100,
       });
       const uniquePatientIds = [
         ...new Set(allAssignments.map((a) => a.patientFhirId)),
-      ];
+      ].slice(0, 50);
 
       const allEncounters = (
         await Promise.all(
@@ -284,11 +287,7 @@ export async function GET(request: NextRequest) {
 
       const signedEncounters = allEncounters
         .filter((e) => e.isSigned)
-        .sort((a, b) => {
-          const da = a.signedAt ? new Date(a.signedAt).getTime() : 0;
-          const db = b.signedAt ? new Date(b.signedAt).getTime() : 0;
-          return db - da;
-        })
+        .sort(sortBySignedAtDesc)
         .slice(0, 50);
 
       // Resolve patient names in parallel

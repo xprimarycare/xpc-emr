@@ -29,6 +29,19 @@ export interface CloneEncounterResult {
   error?: string;
 }
 
+function prepareEncounterClone(sourceEnc: any, targetPatientFhirId: string): any {
+  const cloned = JSON.parse(JSON.stringify(sourceEnc));
+  delete cloned.id;
+  delete cloned.meta;
+  cloned.status = "planned";
+  cloned.subject = { reference: `Patient/${targetPatientFhirId}` };
+  cloned.extension = (cloned.extension || []).filter(
+    (ext: any) => ext.url !== ENCOUNTER_SIGNATURE_EXT
+  );
+  if (cloned.extension.length === 0) delete cloned.extension;
+  return cloned;
+}
+
 /**
  * Clone an Encounter + its ClinicalImpression for a target patient.
  * Strips IDs, removes signing extension, sets status to "planned",
@@ -48,15 +61,7 @@ export async function cloneEncounter(
     if (!sourceEnc) return { error: "Source encounter not found" };
 
     // Clone encounter: strip ID, remove signing ext, update patient ref, set status
-    const clonedEnc = JSON.parse(JSON.stringify(sourceEnc));
-    delete clonedEnc.id;
-    delete clonedEnc.meta;
-    clonedEnc.status = "planned";
-    clonedEnc.subject = { reference: `Patient/${options.targetPatientFhirId}` };
-    clonedEnc.extension = (clonedEnc.extension || []).filter(
-      (ext: any) => ext.url !== ENCOUNTER_SIGNATURE_EXT
-    );
-    if (clonedEnc.extension.length === 0) delete clonedEnc.extension;
+    const clonedEnc = prepareEncounterClone(sourceEnc, options.targetPatientFhirId);
 
     const newEnc = (await phenomlClient.fhir.create(providerId, "Encounter", {
       body: clonedEnc,
@@ -228,54 +233,48 @@ export async function clonePatient(
           .map((e: any) => e.resource)
           .filter(Boolean);
 
-        let encounterCount = 0;
-        for (const sourceEnc of encounters) {
-          const clonedEnc = JSON.parse(JSON.stringify(sourceEnc));
-          delete clonedEnc.id;
-          delete clonedEnc.meta;
-          clonedEnc.status = "planned";
-          clonedEnc.subject = { reference: `Patient/${newPatientFhirId}` };
-          clonedEnc.extension = (clonedEnc.extension || []).filter(
-            (ext: any) => ext.url !== ENCOUNTER_SIGNATURE_EXT
-          );
-          if (clonedEnc.extension.length === 0) delete clonedEnc.extension;
+        const results = await Promise.all(
+          encounters.map(async (sourceEnc: any) => {
+            const clonedEnc = prepareEncounterClone(sourceEnc, newPatientFhirId);
+            const newEnc = (await phenomlClient.fhir.create(providerId!, "Encounter", {
+              body: clonedEnc,
+            })) as any;
+            if (!newEnc?.id) return false;
 
-          const newEnc = (await phenomlClient.fhir.create(providerId!, "Encounter", {
-            body: clonedEnc,
-          })) as any;
-          if (!newEnc?.id) continue;
-          encounterCount++;
+            // Clone ClinicalImpressions for this encounter
+            const ciBundle = await phenomlClient.fhir.search(
+              providerId!,
+              "ClinicalImpression",
+              {},
+              {
+                queryParams: {
+                  subject: `Patient/${options.sourcePatientFhirId}`,
+                  encounter: `Encounter/${sourceEnc.id}`,
+                  _count: "100",
+                },
+              }
+            );
+            const impressions = ((ciBundle as any)?.entry || [])
+              .map((e: any) => e.resource)
+              .filter(Boolean);
 
-          // Clone ClinicalImpressions for this encounter
-          const ciBundle = await phenomlClient.fhir.search(
-            providerId!,
-            "ClinicalImpression",
-            {},
-            {
-              queryParams: {
-                subject: `Patient/${options.sourcePatientFhirId}`,
-                encounter: `Encounter/${sourceEnc.id}`,
-                _count: "100",
-              },
-            }
-          );
-          const impressions = ((ciBundle as any)?.entry || [])
-            .map((e: any) => e.resource)
-            .filter(Boolean);
-
-          for (const sourceCI of impressions) {
-            const clonedCI = JSON.parse(JSON.stringify(sourceCI));
-            delete clonedCI.id;
-            delete clonedCI.meta;
-            clonedCI.status = "in-progress";
-            clonedCI.subject = { reference: `Patient/${newPatientFhirId}` };
-            clonedCI.encounter = { reference: `Encounter/${newEnc.id}` };
-            await phenomlClient.fhir.create(providerId!, "ClinicalImpression", {
-              body: clonedCI,
-            });
-          }
-        }
-        clonedCounts["encounters"] = encounterCount;
+            await Promise.all(
+              impressions.map(async (sourceCI: any) => {
+                const clonedCI = JSON.parse(JSON.stringify(sourceCI));
+                delete clonedCI.id;
+                delete clonedCI.meta;
+                clonedCI.status = "in-progress";
+                clonedCI.subject = { reference: `Patient/${newPatientFhirId}` };
+                clonedCI.encounter = { reference: `Encounter/${newEnc.id}` };
+                await phenomlClient.fhir.create(providerId!, "ClinicalImpression", {
+                  body: clonedCI,
+                });
+              })
+            );
+            return true;
+          })
+        );
+        clonedCounts["encounters"] = results.filter(Boolean).length;
       } catch (err) {
         errors.push(
           `Failed to clone encounters: ${err instanceof Error ? err.message : "unknown error"}`
