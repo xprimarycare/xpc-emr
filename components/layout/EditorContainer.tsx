@@ -36,8 +36,15 @@ export function EditorContainer() {
   const { activePatient, updateTabProperties } = usePatient();
   const { activeTabId, leftPanelMode } = useEditor();
 
-  // Hide editor when case library is shown as full page (clinician view)
-  if (leftPanelMode === 'caseLibrary') return null;
+  // All hooks must be called before any early return (Rules of Hooks)
+  const [showNote, setShowNote] = useState(false);
+  const [labView, setLabView] = useState<'pending' | 'results'>('pending');
+  const [labCounts, setLabCounts] = useState({ pending: 0, results: 0 });
+  const [imagingView, setImagingView] = useState<'pending' | 'results'>('pending');
+  const [imagingCounts, setImagingCounts] = useState({ pending: 0, results: 0 });
+  const [referralView, setReferralView] = useState<'pending' | 'completed'>('pending');
+  const [referralCounts, setReferralCounts] = useState({ pending: 0, completed: 0 });
+  const [refreshKey, setRefreshKey] = useState(0);
 
   const activeTab = activePatient?.tabs.find(t => t.id === activeTabId);
 
@@ -57,15 +64,6 @@ export function EditorContainer() {
   const isReferralsTab = activeTab?.name === 'Referrals' && isFhirPatient;
   const isEncounterTab = activeTab?.section === 'encounters' && isFhirPatient;
   const isTaskTab = activeTab?.section === 'tasks' && isFhirPatient;
-
-  const [showNote, setShowNote] = useState(false);
-  const [labView, setLabView] = useState<'pending' | 'results'>('pending');
-  const [labCounts, setLabCounts] = useState({ pending: 0, results: 0 });
-  const [imagingView, setImagingView] = useState<'pending' | 'results'>('pending');
-  const [imagingCounts, setImagingCounts] = useState({ pending: 0, results: 0 });
-  const [referralView, setReferralView] = useState<'pending' | 'completed'>('pending');
-  const [referralCounts, setReferralCounts] = useState({ pending: 0, completed: 0 });
-  const [refreshKey, setRefreshKey] = useState(0);
 
   // Determine which structured component to render in the top panel
   const structuredContent = useMemo(() => {
@@ -120,6 +118,9 @@ export function EditorContainer() {
       updateTabProperties(activePatient.id, activeTabId, { name: autoName });
     }
   }, [activePatient, activeTabId, activeTab]);
+
+  // Hide editor when case library is shown as full page (clinician view)
+  if (leftPanelMode === 'caseLibrary') return null;
 
   return (
     <div className="flex-1 flex flex-col bg-white overflow-hidden">

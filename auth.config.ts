@@ -37,6 +37,10 @@ export default {
       session.user.npi = token.npi as string | null
       session.user.fhirPractitionerId = token.fhirPractitionerId as string | null
       session.user.onboardingComplete = token.onboardingComplete as boolean
+      if (token.originalAdminId) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        ;(session.user as any).originalAdminId = token.originalAdminId
+      }
       return session
     },
   },
