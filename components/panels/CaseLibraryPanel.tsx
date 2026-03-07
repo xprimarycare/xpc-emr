@@ -162,6 +162,51 @@ export function CaseLibraryPanel() {
     });
   }, [userPatients, statusSort]);
 
+  const handleEncounterClick = async (patientFhirId: string, encounterFhirId?: string, patientName?: string) => {
+    // Check if patient is already open
+    const existing = patients.find((p) => p.fhirId === patientFhirId);
+    if (existing) {
+      setActivePatientId(existing.id);
+      // Navigate to the specific encounter tab if provided
+      if (encounterFhirId) {
+        const tab = existing.tabs.find((t) => t.encounterFhirId === encounterFhirId);
+        if (tab) setActiveTabId(tab.id);
+      }
+    } else {
+      const patientId = `fhir-${patientFhirId}`;
+      const name = patientName || 'Patient';
+      addPatient({
+        id: patientId,
+        name,
+        mrn: '',
+        dob: '',
+        sex: '',
+        fhirId: patientFhirId,
+        tabs: createDefaultTabs({ name, mrn: '', dob: '', sex: '' }),
+      });
+
+      // Fetch full patient details to fill in demographics
+      fetch(`/api/fhir/patient?id=${patientFhirId}`)
+        .then((res) => (res.ok ? res.json() : null))
+        .then((bundle) => {
+          const resource = bundle?.entry?.[0]?.resource;
+          if (resource) {
+            const fhirName = resource.name?.[0];
+            const given = fhirName?.given?.join(' ') || '';
+            const family = fhirName?.family || '';
+            const fullName = [given, family].filter(Boolean).join(' ');
+            updatePatient(patientId, {
+              name: fullName || name,
+              dob: resource.birthDate || '',
+              sex: resource.gender || '',
+            });
+          }
+        })
+        .catch(() => {});
+    }
+    toggleLeftPanel('sidebar');
+  };
+
   if (leftPanelMode !== 'caseLibrary') {
     return null;
   }
@@ -169,7 +214,12 @@ export function CaseLibraryPanel() {
   if (isAdmin) {
     return (
       <div className="flex-1 border-r bg-white overflow-y-auto">
-        <PatientLibrary asPanel />
+        <PatientLibrary
+          asPanel
+          onOpen={(patientFhirId, patientName) =>
+            handleEncounterClick(patientFhirId, undefined, patientName)
+          }
+        />
       </div>
     );
   }
@@ -225,51 +275,6 @@ export function CaseLibraryPanel() {
         // Continue even if status update fails
       }
     }
-  };
-
-  const handleEncounterClick = async (patientFhirId: string, encounterFhirId?: string, patientName?: string) => {
-    // Check if patient is already open
-    const existing = patients.find((p) => p.fhirId === patientFhirId);
-    if (existing) {
-      setActivePatientId(existing.id);
-      // Navigate to the specific encounter tab if provided
-      if (encounterFhirId) {
-        const tab = existing.tabs.find((t) => t.encounterFhirId === encounterFhirId);
-        if (tab) setActiveTabId(tab.id);
-      }
-    } else {
-      const patientId = `fhir-${patientFhirId}`;
-      const name = patientName || 'Patient';
-      addPatient({
-        id: patientId,
-        name,
-        mrn: '',
-        dob: '',
-        sex: '',
-        fhirId: patientFhirId,
-        tabs: createDefaultTabs({ name, mrn: '', dob: '', sex: '' }),
-      });
-
-      // Fetch full patient details to fill in demographics
-      fetch(`/api/fhir/patient?id=${patientFhirId}`)
-        .then((res) => (res.ok ? res.json() : null))
-        .then((bundle) => {
-          const resource = bundle?.entry?.[0]?.resource;
-          if (resource) {
-            const fhirName = resource.name?.[0];
-            const given = fhirName?.given?.join(' ') || '';
-            const family = fhirName?.family || '';
-            const fullName = [given, family].filter(Boolean).join(' ');
-            updatePatient(patientId, {
-              name: fullName || name,
-              dob: resource.birthDate || '',
-              sex: resource.gender || '',
-            });
-          }
-        })
-        .catch(() => {});
-    }
-    toggleLeftPanel('sidebar');
   };
 
   // --- Render helpers ---

@@ -139,7 +139,7 @@ function parseFhirBundle(bundle: any): FhirPatientRow[] {
 // Component
 // ---------------------------------------------------------------------------
 
-export function PatientLibrary({ asPanel = false }: { asPanel?: boolean }) {
+export function PatientLibrary({ asPanel = false, onOpen }: { asPanel?: boolean; onOpen?: (patientFhirId: string, patientName: string) => void }) {
   // Tabs
   const [activeTab, setActiveTab] = useState<'cases' | 'assignments'>('cases');
 
@@ -299,7 +299,7 @@ export function PatientLibrary({ asPanel = false }: { asPanel?: boolean }) {
       </div>
 
       {/* Assignments tab */}
-      {activeTab === 'assignments' && <AssignmentsTable />}
+      {activeTab === 'assignments' && <AssignmentsTable onOpen={onOpen} />}
 
       {/* Cases tab content */}
       {activeTab === 'cases' && <>
