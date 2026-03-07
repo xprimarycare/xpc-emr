@@ -26,7 +26,7 @@ export default async function AdminPage() {
 
         <div className="bg-white rounded-lg border p-6 space-y-6">
           <div>
-            <h1 className="text-xl font-semibold text-gray-900">Team Management</h1>
+            <h1 className="text-xl font-semibold text-gray-900">User Management</h1>
             <p className="text-sm text-gray-500 mt-1">Manage user roles and access</p>
           </div>
 
@@ -34,20 +34,6 @@ export default async function AdminPage() {
 
           <UserManagement currentUserId={session.user.id} />
 
-          <hr className="border-gray-200" />
-
-          <Link
-            href="/admin/assignments"
-            className="block text-sm text-blue-600 hover:text-blue-800 font-medium"
-          >
-            Case Assignments &rarr;
-          </Link>
-          <Link
-            href="/admin/patients"
-            className="block text-sm text-blue-600 hover:text-blue-800 font-medium"
-          >
-            Patient Library &rarr;
-          </Link>
         </div>
       </div>
     </div>

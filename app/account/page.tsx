@@ -61,13 +61,7 @@ export default async function AccountPage() {
                 href="/admin"
                 className="block text-sm text-blue-600 hover:text-blue-800 font-medium"
               >
-                Team Management &rarr;
-              </Link>
-              <Link
-                href="/admin/assignments"
-                className="block text-sm text-blue-600 hover:text-blue-800 font-medium mt-2"
-              >
-                Case Assignments &rarr;
+                User Management &rarr;
               </Link>
             </>
           )}
