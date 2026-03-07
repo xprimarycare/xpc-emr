@@ -79,3 +79,15 @@ model PatientTag {
   @@index([patientFhirId])
   @@map("patient_tags")
 }
+
+model ImpersonationLog {
+  id           String    @id @default(cuid())
+  adminId      String
+  targetUserId String
+  startedAt    DateTime  @default(now())
+  endedAt      DateTime?
+
+  @@index([adminId])
+  @@index([targetUserId])
+  @@map("impersonation_logs")
+}

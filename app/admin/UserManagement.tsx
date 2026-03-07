@@ -1,6 +1,8 @@
 'use client'
 
 import React, { useEffect, useState } from 'react'
+import { useSession } from 'next-auth/react'
+import { useRouter } from 'next/navigation'
 
 interface User {
   id: string
@@ -18,6 +20,8 @@ export function UserManagement({ currentUserId }: { currentUserId: string }) {
   const [users, setUsers] = useState<User[]>([])
   const [loading, setLoading] = useState(true)
   const [rowStatuses, setRowStatuses] = useState<Record<string, RowStatus>>({})
+  const { update } = useSession()
+  const router = useRouter()
 
   useEffect(() => {
     fetch('/api/user/list')
@@ -60,6 +64,27 @@ export function UserManagement({ currentUserId }: { currentUserId: string }) {
     }
   }
 
+  const handleImpersonate = async (userId: string) => {
+    try {
+      const res = await fetch('/api/admin/impersonate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId }),
+      })
+
+      if (!res.ok) {
+        const data = await res.json()
+        throw new Error(data.error || 'Failed to impersonate')
+      }
+
+      // Pass the target userId to the JWT callback via update()
+      await update({ impersonating: userId })
+      router.push('/')
+    } catch (err) {
+      console.error('Impersonation failed:', err)
+    }
+  }
+
   if (loading) {
     return <div className="text-sm text-gray-500">Loading team members...</div>
   }
@@ -95,6 +120,15 @@ export function UserManagement({ currentUserId }: { currentUserId: string }) {
                 <option value="user">Clinician</option>
                 <option value="admin">Admin</option>
               </select>
+
+              {!isSelf && user.role !== 'admin' && (
+                <button
+                  onClick={() => handleImpersonate(user.id)}
+                  className="text-xs text-blue-600 hover:text-blue-800 font-medium"
+                >
+                  Impersonate
+                </button>
+              )}
 
               {status.state === 'saving' && (
                 <span className="text-xs text-gray-400 w-12">Saving...</span>

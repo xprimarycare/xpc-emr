@@ -25,6 +25,7 @@ declare module "next-auth" {
       fhirPractitionerId: string | null
       onboardingComplete: boolean
       role: string
+      originalAdminId?: string
     }
   }
 
@@ -90,7 +91,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     strategy: "jwt",
   },
   callbacks: {
-    async jwt({ token, user, trigger }) {
+    async jwt({ token, user, trigger, session }) {
       if (user) {
         // On sign-in: read fields directly from the user object returned by
         // authorize (credentials) or the adapter (OAuth) — no extra DB call.
@@ -101,27 +102,78 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         token.onboardingComplete = user.onboardingComplete
         token.role = user.role
       } else if (trigger === "update" && token.id) {
-        // Explicit session refresh (e.g. after onboarding) — fetch fresh data.
-        try {
-          const dbUser = await prisma.user.findUnique({
-            where: { id: token.id as string },
-            select: {
-              institution: true,
-              npi: true,
-              fhirPractitionerId: true,
-              onboardingComplete: true,
-              role: true,
-            },
-          })
-          if (dbUser) {
-            token.institution = dbUser.institution
-            token.npi = dbUser.npi
-            token.fhirPractitionerId = dbUser.fhirPractitionerId
-            token.onboardingComplete = dbUser.onboardingComplete
-            token.role = dbUser.role
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const data = session as any
+
+        if (data?.impersonating && token.role === "admin") {
+          // Start impersonation: load the target user's data
+          try {
+            const targetUser = await prisma.user.findUnique({
+              where: { id: data.impersonating as string },
+              select: { id: true, name: true, email: true, image: true, institution: true, npi: true, fhirPractitionerId: true, onboardingComplete: true, role: true },
+            })
+            if (targetUser) {
+              token.originalAdminId = token.id // preserve real admin id
+              token.id = targetUser.id
+              token.name = targetUser.name
+              token.email = targetUser.email
+              token.picture = targetUser.image
+              token.institution = targetUser.institution
+              token.npi = targetUser.npi
+              token.fhirPractitionerId = targetUser.fhirPractitionerId
+              token.onboardingComplete = targetUser.onboardingComplete
+              token.role = targetUser.role
+              return token
+            }
+          } catch {
+            // Keep existing token values on error
           }
-        } catch {
-          // DB unavailable — keep existing token values
+        } else if (data?.stopImpersonating && token.originalAdminId) {
+          // Stop impersonation: restore the original admin's data
+          try {
+            const adminUser = await prisma.user.findUnique({
+              where: { id: token.originalAdminId as string },
+              select: { id: true, name: true, email: true, image: true, institution: true, npi: true, fhirPractitionerId: true, onboardingComplete: true, role: true },
+            })
+            if (adminUser) {
+              token.id = adminUser.id
+              token.name = adminUser.name
+              token.email = adminUser.email
+              token.picture = adminUser.image
+              token.institution = adminUser.institution
+              token.npi = adminUser.npi
+              token.fhirPractitionerId = adminUser.fhirPractitionerId
+              token.onboardingComplete = adminUser.onboardingComplete
+              token.role = adminUser.role
+              delete token.originalAdminId
+              return token
+            }
+          } catch {
+            // Keep existing token values on error
+          }
+        } else {
+          // Explicit session refresh (e.g. after onboarding) — fetch fresh data.
+          try {
+            const dbUser = await prisma.user.findUnique({
+              where: { id: token.id as string },
+              select: {
+                institution: true,
+                npi: true,
+                fhirPractitionerId: true,
+                onboardingComplete: true,
+                role: true,
+              },
+            })
+            if (dbUser) {
+              token.institution = dbUser.institution
+              token.npi = dbUser.npi
+              token.fhirPractitionerId = dbUser.fhirPractitionerId
+              token.onboardingComplete = dbUser.onboardingComplete
+              token.role = dbUser.role
+            }
+          } catch {
+            // DB unavailable — keep existing token values
+          }
         }
       }
 
@@ -134,6 +186,9 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       session.user.fhirPractitionerId = token.fhirPractitionerId as string | null
       session.user.onboardingComplete = token.onboardingComplete as boolean
       session.user.role = token.role as string
+      if (token.originalAdminId) {
+        session.user.originalAdminId = token.originalAdminId as string
+      }
       return session
     },
   },
