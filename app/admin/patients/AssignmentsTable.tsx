@@ -1,7 +1,9 @@
 'use client';
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { RefreshCw } from 'lucide-react';
+import { STATUS_BADGE, STATUS_TAB_LABELS, CaseStatus } from '@/lib/constants/case-status';
+import type { CaseStatusValue } from '@/lib/constants/case-status';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -18,21 +20,19 @@ interface AssignmentRow {
   by: string;
 }
 
+interface AssignmentData {
+  id: number;
+  patientFhirId: string;
+  patientName: string;
+  clinicianName: string;
+  status: string;
+  assignedAt: string;
+  assignedByName?: string;
+}
+
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
-
-const STATUS_DISPLAY: Record<string, string> = {
-  waiting_room: 'Waiting Room',
-  in_progress: 'In Progress',
-  completed: 'Completed',
-};
-
-const STATUS_BADGE: Record<string, string> = {
-  'Waiting Room': 'bg-yellow-100 text-yellow-800',
-  'In Progress': 'bg-blue-100 text-blue-800',
-  'Completed': 'bg-green-100 text-green-800',
-};
 
 const COL_LABELS: Record<string, string> = {
   patient: 'Patient',
@@ -45,6 +45,23 @@ const COL_LABELS: Record<string, string> = {
 
 const COLS = ['patient', 'condition', 'clinician', 'status', 'date', 'by'] as const;
 type ColKey = (typeof COLS)[number];
+
+// Badge classes keyed by display label (derived from shared constants)
+const STATUS_BADGE_CLASSES: Record<string, string> = Object.fromEntries(
+  Object.values(CaseStatus).map((v) => {
+    const { bg, text } = STATUS_BADGE[v];
+    return [STATUS_TAB_LABELS[v], `${bg} ${text}`];
+  })
+);
+
+const COL_DEFS: { col: ColKey; label: string; alignRight?: boolean }[] = [
+  { col: 'patient', label: 'Patient' },
+  { col: 'condition', label: 'Condition' },
+  { col: 'clinician', label: 'Clinician' },
+  { col: 'status', label: 'Status' },
+  { col: 'date', label: 'Assigned', alignRight: true },
+  { col: 'by', label: 'Assigned By', alignRight: true },
+];
 
 // ---------------------------------------------------------------------------
 // ColumnFilter component
@@ -260,7 +277,7 @@ export function AssignmentsTable() {
     try {
       const res = await fetch('/api/case-library?view=assignments');
       if (!res.ok) throw new Error('Failed to fetch assignments');
-      const data: any[] = await res.json();
+      const data: AssignmentData[] = await res.json();
 
       // Fetch patient tags for conditions
       const patientIds = [...new Set(data.map((a) => a.patientFhirId))];
@@ -287,7 +304,7 @@ export function AssignmentsTable() {
         patient: a.patientName,
         condition: conditionMap[a.patientFhirId] ?? '—',
         clinician: a.clinicianName,
-        status: STATUS_DISPLAY[a.status] ?? a.status,
+        status: STATUS_TAB_LABELS[a.status as CaseStatusValue] ?? a.status,
         date: new Date(a.assignedAt).toLocaleDateString('en-US', {
           month: 'short',
           day: 'numeric',
@@ -307,18 +324,19 @@ export function AssignmentsTable() {
     fetchData();
   }, [fetchData]);
 
-  const getColValues = (col: ColKey) => {
-    const seen = new Set<string>();
-    const vals: string[] = [];
-    rows.forEach((r) => {
-      const v = r[col];
-      if (!seen.has(v)) {
-        seen.add(v);
-        vals.push(v);
-      }
-    });
-    return vals.sort();
-  };
+  const colValues = useMemo(() => {
+    const result = {} as Record<ColKey, string[]>;
+    for (const col of COLS) {
+      const seen = new Set<string>();
+      const vals: string[] = [];
+      rows.forEach((r) => {
+        const v = r[col];
+        if (!seen.has(v)) { seen.add(v); vals.push(v); }
+      });
+      result[col] = vals.sort();
+    }
+    return result;
+  }, [rows]);
 
   const setFilter = (col: ColKey, selected: Set<string>) => {
     setColumnFilters((prev) => ({ ...prev, [col]: selected }));
@@ -328,24 +346,21 @@ export function AssignmentsTable() {
     setColumnFilters((prev) => ({ ...prev, [col]: null }));
   };
 
-  const filteredRows = rows.filter((row) =>
-    COLS.every((col) => {
-      const f = columnFilters[col];
-      if (!f) return true;
-      return f.has(row[col]);
-    })
+  const filteredRows = useMemo(
+    () => rows.filter((row) =>
+      COLS.every((col) => {
+        const f = columnFilters[col];
+        if (!f) return true;
+        return f.has(row[col]);
+      })
+    ),
+    [rows, columnFilters]
   );
 
-  const activeCols = COLS.filter((col) => columnFilters[col]);
-
-  const colDefs: { col: ColKey; label: string; alignRight?: boolean }[] = [
-    { col: 'patient', label: 'Patient' },
-    { col: 'condition', label: 'Condition' },
-    { col: 'clinician', label: 'Clinician' },
-    { col: 'status', label: 'Status' },
-    { col: 'date', label: 'Assigned', alignRight: true },
-    { col: 'by', label: 'Assigned By', alignRight: true },
-  ];
+  const activeCols = useMemo(
+    () => COLS.filter((col) => columnFilters[col]),
+    [columnFilters]
+  );
 
   return (
     <div>
@@ -400,7 +415,7 @@ export function AssignmentsTable() {
           <table className="w-full text-sm">
             <thead className="bg-gray-50 border-b border-gray-100">
               <tr>
-                {colDefs.map(({ col, label, alignRight }) => (
+                {COL_DEFS.map(({ col, label, alignRight }) => (
                   <th
                     key={col}
                     className={`group px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider relative ${
@@ -412,7 +427,7 @@ export function AssignmentsTable() {
                       <ColumnFilter
                         col={col}
                         label={label}
-                        values={getColValues(col)}
+                        values={colValues[col]}
                         activeFilter={columnFilters[col] ?? null}
                         onApply={(sel) => setFilter(col, sel)}
                         onClear={() => clearFilter(col)}
@@ -434,7 +449,7 @@ export function AssignmentsTable() {
                   <td className="px-6 py-3">
                     <span
                       className={`px-2 py-0.5 rounded text-xs font-medium ${
-                        STATUS_BADGE[row.status] ?? 'bg-gray-100 text-gray-600'
+                        STATUS_BADGE_CLASSES[row.status] ?? 'bg-gray-100 text-gray-600'
                       }`}
                     >
                       {row.status}
