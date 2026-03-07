@@ -1,8 +1,6 @@
 'use client'
 
 import React, { useState } from 'react'
-import { useSession } from 'next-auth/react'
-import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 
 interface OnboardingFormProps {
@@ -11,8 +9,6 @@ interface OnboardingFormProps {
 }
 
 export function OnboardingForm({ userName, userEmail }: OnboardingFormProps) {
-  const { update } = useSession()
-  const router = useRouter()
   const [institution, setInstitution] = useState('')
   const [npi, setNpi] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -38,9 +34,7 @@ export function OnboardingForm({ userName, userEmail }: OnboardingFormProps) {
         throw new Error(data.error || 'Failed to save profile')
       }
 
-      // Trigger NextAuth to refresh the JWT from the DB
-      await update()
-      router.push('/')
+      window.location.href = '/'
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong')
     } finally {
