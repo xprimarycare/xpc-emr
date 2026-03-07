@@ -35,64 +35,64 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const results = await Promise.allSettled(
+    const results = await Promise.all(
       clinicianIds.map(async (clinicianId: string) => {
-        let clonedEncounterFhirId: string | undefined;
+        try {
+          let clonedEncounterFhirId: string | undefined;
 
-        // Clone encounter if provided
-        if (encounterFhirId) {
-          const cloneResult = await cloneEncounter({
-            sourcePatientFhirId: patientFhirId.trim(),
-            sourceEncounterFhirId: encounterFhirId.trim(),
-            targetPatientFhirId: patientFhirId.trim(),
-            includeNoteText,
-          });
-          if (cloneResult.error) {
-            return { clinicianId, success: false as const, error: cloneResult.error };
+          // Clone encounter if provided
+          if (encounterFhirId) {
+            const cloneResult = await cloneEncounter({
+              sourcePatientFhirId: patientFhirId.trim(),
+              sourceEncounterFhirId: encounterFhirId.trim(),
+              targetPatientFhirId: patientFhirId.trim(),
+              includeNoteText,
+            });
+            if (cloneResult.error) {
+              return { clinicianId, success: false as const, error: cloneResult.error };
+            }
+            clonedEncounterFhirId = cloneResult.encounterFhirId;
           }
-          clonedEncounterFhirId = cloneResult.encounterFhirId;
-        }
 
-        // Create/update assignment
-        const data = {
-          status: CaseStatus.WAITING_ROOM,
-          assignedBy: authResult.user.id,
-          encounterFhirId: clonedEncounterFhirId || undefined,
-          sourceEncounterFhirId: encounterFhirId?.trim() || undefined,
-          sourcePatientFhirId: patientFhirId.trim(),
-          includeNoteText,
-        };
+          // Create/update assignment
+          const data = {
+            status: CaseStatus.WAITING_ROOM,
+            assignedBy: authResult.user.id,
+            encounterFhirId: clonedEncounterFhirId || undefined,
+            sourceEncounterFhirId: encounterFhirId?.trim() || undefined,
+            sourcePatientFhirId: patientFhirId.trim(),
+            includeNoteText,
+          };
 
-        await prisma.userPatient.upsert({
-          where: {
-            userId_patientFhirId: {
+          await prisma.userPatient.upsert({
+            where: {
+              userId_patientFhirId: {
+                userId: clinicianId,
+                patientFhirId: patientFhirId.trim(),
+              },
+            },
+            update: data,
+            create: {
               userId: clinicianId,
               patientFhirId: patientFhirId.trim(),
+              ...data,
             },
-          },
-          update: data,
-          create: {
-            userId: clinicianId,
-            patientFhirId: patientFhirId.trim(),
-            ...data,
-          },
-        });
+          });
 
-        return {
-          clinicianId,
-          success: true as const,
-          encounterFhirId: clonedEncounterFhirId,
-        };
+          return {
+            clinicianId,
+            success: true as const,
+            encounterFhirId: clonedEncounterFhirId,
+          };
+        } catch (err) {
+          const message = err instanceof Error ? err.message : "Unknown error";
+          console.error(`Assignment failed for clinician ${clinicianId}:`, err);
+          return { clinicianId, success: false as const, error: message };
+        }
       })
     );
 
-    return NextResponse.json({
-      results: results.map((r) =>
-        r.status === "fulfilled"
-          ? r.value
-          : { clinicianId: "", success: false, error: "Unknown error" }
-      ),
-    });
+    return NextResponse.json({ results });
   } catch (error) {
     console.error("Assignment API error:", error);
     return NextResponse.json(
