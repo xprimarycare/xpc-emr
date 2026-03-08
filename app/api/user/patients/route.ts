@@ -62,8 +62,11 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Allow assigning to another user (e.g. when selecting a PCP)
+    // Only admins may assign to another user
     const targetUserId = userId?.trim() || session.user.id
+    if (targetUserId !== session.user.id && session.user.role !== "admin") {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+    }
 
     // Validate target user exists and is onboarded
     if (targetUserId !== session.user.id) {

@@ -32,6 +32,15 @@ export default auth((req) => {
     return NextResponse.redirect(loginUrl)
   }
 
+  // Enforce onboarding for authenticated page routes (not API or the onboarding page itself)
+  if (
+    !pathname.startsWith("/api/") &&
+    !pathname.startsWith("/onboarding") &&
+    !req.auth.user?.onboardingComplete
+  ) {
+    return NextResponse.redirect(new URL("/onboarding", req.url))
+  }
+
   return NextResponse.next()
 })
 

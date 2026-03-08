@@ -35,6 +35,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Verify all clinicians exist and have completed onboarding
+    const clinicians = await prisma.user.findMany({
+      where: { id: { in: clinicianIds }, onboardingComplete: true },
+      select: { id: true },
+    });
+    const validIds = new Set(clinicians.map((c) => c.id));
+    const invalidIds = clinicianIds.filter((id: string) => !validIds.has(id));
+    if (invalidIds.length > 0) {
+      return NextResponse.json(
+        { error: `Unknown or unonboarded clinicians: ${invalidIds.join(", ")}` },
+        { status: 400 }
+      );
+    }
+
     const results = await Promise.all(
       clinicianIds.map(async (clinicianId: string) => {
         try {
