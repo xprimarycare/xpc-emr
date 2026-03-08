@@ -7,7 +7,7 @@ import { useAuth } from '@/lib/context/AuthContext';
 import { usePatient } from '@/lib/context/PatientContext';
 import { AssignCaseDialog } from '@/components/dialogs/AssignCaseDialog';
 import { DuplicatePatientDialog } from '@/components/dialogs/DuplicatePatientDialog';
-import { STATUS_BADGE, CaseStatus, STATUS_ORDER, formatDateTime } from '@/lib/constants/case-status';
+import { STATUS_BADGE, CaseStatus, STATUS_ORDER, UserRole, formatDateTime } from '@/lib/constants/case-status';
 import type { CaseStatusValue } from '@/lib/constants/case-status';
 import { createDefaultTabs } from '@/lib/data/default-tabs';
 import { PatientLibrary } from '@/app/admin/patients/PatientLibrary';
@@ -62,12 +62,11 @@ export function CaseLibraryPanel() {
   const { user } = useAuth();
   const { addPatient, setActivePatientId, updatePatient, patients } = usePatient();
 
-  const isAdmin = user?.role === 'admin';
+  const isAdmin = user?.role === UserRole.ADMIN;
 
   const [view, setView] = useState<CaseLibraryView>(
     isAdmin ? { type: 'users' } : { type: 'user-patients', userId: user?.id || '', userName: 'My Patients' }
   );
-  const [adminTab, setAdminTab] = useState<'users' | 'recent'>('users');
   // Track the user we drilled into so back from patient-encounters returns to their patients
   const [parentUser, setParentUser] = useState<{ userId: string; userName: string } | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -88,7 +87,6 @@ export function CaseLibraryPanel() {
     if (leftPanelMode === 'caseLibrary') {
       if (isAdmin) {
         setView({ type: 'users' });
-        setAdminTab('users');
       } else if (user?.id) {
         setView({ type: 'user-patients', userId: user.id, userName: 'My Patients' });
       }
@@ -198,12 +196,7 @@ export function CaseLibraryPanel() {
   };
 
   const handleAdminTabChange = (tab: 'users' | 'recent') => {
-    setAdminTab(tab);
-    if (tab === 'users') {
-      setView({ type: 'users' });
-    } else {
-      setView({ type: 'recent-activity' });
-    }
+    setView(tab === 'users' ? { type: 'users' } : { type: 'recent-activity' });
   };
 
   const handlePatientClick = async (patientFhirId: string, patientStatus?: string) => {
@@ -564,7 +557,7 @@ export function CaseLibraryPanel() {
             <button
               onClick={() => handleAdminTabChange('users')}
               className={`px-3 py-1.5 text-sm rounded ${
-                adminTab === 'users'
+                view.type !== 'recent-activity'
                   ? 'bg-gray-100 font-medium text-gray-900'
                   : 'text-gray-500 hover:text-gray-700'
               }`}
@@ -574,7 +567,7 @@ export function CaseLibraryPanel() {
             <button
               onClick={() => handleAdminTabChange('recent')}
               className={`px-3 py-1.5 text-sm rounded ${
-                adminTab === 'recent'
+                view.type === 'recent-activity'
                   ? 'bg-gray-100 font-medium text-gray-900'
                   : 'text-gray-500 hover:text-gray-700'
               }`}

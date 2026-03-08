@@ -92,11 +92,16 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   callbacks: {
     async jwt({ token, user, trigger }) {
       if (user) {
+        // On sign-in: read fields directly from the user object returned by
+        // authorize (credentials) or the adapter (OAuth) — no extra DB call.
         token.id = user.id
-      }
-
-      // On sign-in or explicit update, fetch fresh data from DB
-      if ((user || trigger === "update") && token.id) {
+        token.institution = user.institution
+        token.npi = user.npi
+        token.fhirPractitionerId = user.fhirPractitionerId
+        token.onboardingComplete = user.onboardingComplete
+        token.role = user.role
+      } else if (trigger === "update" && token.id) {
+        // Explicit session refresh (e.g. after onboarding) — fetch fresh data.
         try {
           const dbUser = await prisma.user.findUnique({
             where: { id: token.id as string },

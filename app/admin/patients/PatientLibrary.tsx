@@ -150,7 +150,6 @@ export function PatientLibrary({ asPanel = false }: { asPanel?: boolean }) {
 
   // Search
   const [searchQuery, setSearchQuery] = useState('');
-  const [debouncedQuery, setDebouncedQuery] = useState('');
 
   // Selection
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -226,16 +225,11 @@ export function PatientLibrary({ asPanel = false }: { asPanel?: boolean }) {
     setDrawerPatient(null);
   }, []);
 
-  // Debounce search
-  useEffect(() => {
-    const timeout = setTimeout(() => setDebouncedQuery(searchQuery), 300);
-    return () => clearTimeout(timeout);
-  }, [searchQuery]);
-
   // Fetch on mount and on debounced search change
   useEffect(() => {
-    fetchPatients(debouncedQuery);
-  }, [debouncedQuery, fetchPatients]);
+    const timeout = setTimeout(() => fetchPatients(searchQuery), 300);
+    return () => clearTimeout(timeout);
+  }, [searchQuery, fetchPatients]);
 
   // ---------------------------------------------------------------------------
   // Selection handlers
@@ -491,7 +485,7 @@ export function PatientLibrary({ asPanel = false }: { asPanel?: boolean }) {
         <DuplicatePatientDialog
           onClose={() => {
             setDuplicateTarget(null);
-            fetchPatients(debouncedQuery);
+            fetchPatients(searchQuery);
           }}
           patientFhirId={duplicateTarget.patientFhirId}
           patientName={duplicateTarget.patientName}

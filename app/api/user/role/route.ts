@@ -1,18 +1,14 @@
-import { auth } from "@/auth"
+import { requireAuth, isSession } from "@/lib/auth-helpers"
 import { prisma } from "@/lib/prisma"
 import { NextRequest, NextResponse } from "next/server"
+import { UserRole } from "@/lib/constants/case-status"
 
 export async function PATCH(request: NextRequest) {
   try {
-    const session = await auth()
-    if (!session?.user?.id) {
-      return NextResponse.json(
-        { error: "Authentication required" },
-        { status: 401 }
-      )
-    }
+    const authResult = await requireAuth()
+    if (!isSession(authResult)) return authResult
 
-    if (session.user.role !== "admin") {
+    if (authResult.user.role !== UserRole.ADMIN) {
       return NextResponse.json(
         { error: "Admin access required" },
         { status: 403 }
@@ -28,29 +24,17 @@ export async function PATCH(request: NextRequest) {
       )
     }
 
-    if (role !== "user" && role !== "admin") {
+    if (role !== UserRole.USER && role !== UserRole.ADMIN) {
       return NextResponse.json(
         { error: "Role must be 'user' or 'admin'" },
         { status: 400 }
       )
     }
 
-    if (userId === session.user.id) {
+    if (userId === authResult.user.id) {
       return NextResponse.json(
         { error: "Cannot change your own role" },
         { status: 400 }
-      )
-    }
-
-    const targetUser = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { id: true },
-    })
-
-    if (!targetUser) {
-      return NextResponse.json(
-        { error: "User not found" },
-        { status: 404 }
       )
     }
 
@@ -61,6 +45,10 @@ export async function PATCH(request: NextRequest) {
 
     return NextResponse.json({ success: true })
   } catch (error) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    if ((error as any)?.code === "P2025") {
+      return NextResponse.json({ error: "User not found" }, { status: 404 })
+    }
     console.error("Role update error:", error)
     return NextResponse.json(
       { error: "Failed to update role" },
