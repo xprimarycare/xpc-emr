@@ -1,7 +1,31 @@
+import { faker } from "@faker-js/faker";
 import { phenomlClient } from "@/lib/phenoml/client";
 import { CLONEABLE_RESOURCE_TYPES } from "@/lib/data/cloneable-resource-types";
 
 const providerId = process.env.PHENOML_FHIR_PROVIDER_ID;
+
+const MS_PER_YEAR = 365.25 * 24 * 60 * 60 * 1000;
+
+export function generateFakePatientName(gender: string): { given: string[]; family: string } {
+  const sex =
+    gender === "male" ? "male" :
+    gender === "female" ? "female" :
+    undefined;
+  const given = [sex ? faker.person.firstName(sex) : faker.person.firstName()];
+  const family = faker.person.lastName();
+  return { given, family };
+}
+
+export function generateFakePatientDob(sourceBirthDate: string): string {
+  const now = Date.now();
+  const birthMs = new Date(sourceBirthDate).getTime();
+  if (isNaN(birthMs)) return sourceBirthDate; // guard: return original if unparseable
+  const currentAge = Math.floor((now - birthMs) / MS_PER_YEAR);
+  const latestMs = now - currentAge * MS_PER_YEAR;
+  const earliestMs = now - (currentAge + 1) * MS_PER_YEAR + 86_400_000;
+  const randomMs = earliestMs + Math.random() * (latestMs - earliestMs);
+  return new Date(randomMs).toISOString().split("T")[0];
+}
 
 const ENCOUNTER_SIGNATURE_EXT =
   "http://phenoml.com/fhir/StructureDefinition/encounter-signature";
@@ -119,6 +143,9 @@ export async function cloneEncounter(
 export interface ClonePatientOptions {
   sourcePatientFhirId: string;
   resourceTypes: string[]; // keys from RESOURCE_TYPE_MAP
+  overrideName?: { given: string[]; family: string };
+  overrideBirthDate?: string;
+  overrideGender?: string;
 }
 
 export interface ClonePatientResult {
@@ -149,10 +176,21 @@ export async function clonePatient(
     const sourcePatient = (patBundle as any)?.entry?.[0]?.resource;
     if (!sourcePatient) return { errors: ["Source patient not found"], clonedCounts };
 
-    // Clone patient
+    // Clone patient with a generated name + DOB to avoid duplicate names
     const clonedPatient = JSON.parse(JSON.stringify(sourcePatient));
     delete clonedPatient.id;
     delete clonedPatient.meta;
+
+    const { given, family } = options.overrideName ?? generateFakePatientName(sourcePatient.gender ?? "unknown");
+    clonedPatient.name = [{ given, family }];
+    if (options.overrideBirthDate) {
+      clonedPatient.birthDate = options.overrideBirthDate;
+    } else if (sourcePatient.birthDate) {
+      clonedPatient.birthDate = generateFakePatientDob(sourcePatient.birthDate);
+    }
+    if (options.overrideGender) {
+      clonedPatient.gender = options.overrideGender;
+    }
 
     const newPatient = (await phenomlClient.fhir.create(providerId, "Patient", {
       body: clonedPatient,
@@ -205,13 +243,13 @@ export async function clonePatient(
                 cloned.patient.reference = `Patient/${newPatientFhirId}`;
               }
 
-              await phenomlClient.fhir.create(providerId!, mapping.resourceType, {
+              return phenomlClient.fhir.create(providerId!, mapping.resourceType, {
                 body: cloned,
               });
             })
           );
 
-          clonedCounts[typeKey] = created.length;
+          clonedCounts[typeKey] = created.filter(Boolean).length;
         } catch (err) {
           errors.push(
             `Failed to clone ${typeKey}: ${err instanceof Error ? err.message : "unknown error"}`

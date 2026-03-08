@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.11.1",
+    "@faker-js/faker": "^10.3.0",
     "@floating-ui/react": "^0.27.18",
     "@google-cloud/vertexai": "^1.10.0",
     "@huggingface/transformers": "^3.8.1",

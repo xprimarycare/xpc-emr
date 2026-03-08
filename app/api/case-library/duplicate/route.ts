@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const { sourcePatientFhirId, resourceTypes } = await request.json();
+    const { sourcePatientFhirId, resourceTypes, overrideName, overrideBirthDate, overrideGender } = await request.json();
 
     if (!sourcePatientFhirId?.trim()) {
       return NextResponse.json(
@@ -31,6 +31,9 @@ export async function POST(request: NextRequest) {
     const result = await clonePatient({
       sourcePatientFhirId: sourcePatientFhirId.trim(),
       resourceTypes,
+      overrideName,
+      overrideBirthDate,
+      overrideGender,
     });
 
     return NextResponse.json(result);

@@ -1,6 +1,7 @@
 import { phenomlClient } from "@/lib/phenoml/client";
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth, isSession } from "@/lib/auth-helpers";
+import { prisma } from "@/lib/prisma";
 
 // GET /api/fhir/patient - Search patients
 // GET /api/fhir/patient?id=123 - Get specific patient
@@ -183,6 +184,40 @@ export async function PUT(request: NextRequest) {
     const status = (error as any)?.statusCode || 500;
     const message =
       error instanceof Error ? error.message : "Failed to update patient";
+    return NextResponse.json({ error: message }, { status });
+  }
+}
+
+// DELETE /api/fhir/patient?id=<fhirId>
+// Admin-only: deletes the patient from FHIR and cleans up local Prisma records
+export async function DELETE(request: NextRequest) {
+  const authResult = await requireAuth();
+  if (!isSession(authResult)) return authResult;
+
+  if (authResult.user.role !== "admin") {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  const fhirId = request.nextUrl.searchParams.get("id");
+  if (!fhirId?.trim()) {
+    return NextResponse.json({ error: "id is required" }, { status: 400 });
+  }
+
+  const providerId = process.env.PHENOML_FHIR_PROVIDER_ID;
+  if (!providerId) {
+    return NextResponse.json({ error: "FHIR provider not configured" }, { status: 500 });
+  }
+
+  try {
+    await phenomlClient.fhir.delete(providerId, `Patient/${fhirId}`);
+    await prisma.userPatient.deleteMany({ where: { patientFhirId: fhirId } });
+    await prisma.patientTag.deleteMany({ where: { patientFhirId: fhirId } });
+    return NextResponse.json({ deleted: fhirId });
+  } catch (error) {
+    console.error("FHIR Patient delete error:", error);
+    const rawStatus = (error as any)?.statusCode;
+    const status = [400, 404, 409, 422, 500].includes(rawStatus) ? rawStatus : 500;
+    const message = error instanceof Error ? error.message : "Failed to delete patient";
     return NextResponse.json({ error: message }, { status });
   }
 }
