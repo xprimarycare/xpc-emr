@@ -93,14 +93,26 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   callbacks: {
     async jwt({ token, user, trigger, session }) {
       if (user) {
-        // On sign-in: read fields directly from the user object returned by
-        // authorize (credentials) or the adapter (OAuth) — no extra DB call.
         token.id = user.id
         token.institution = user.institution
         token.npi = user.npi
         token.fhirPractitionerId = user.fhirPractitionerId
         token.onboardingComplete = user.onboardingComplete
         token.role = user.role
+        // OAuth providers don't pass custom fields — fetch from DB if missing
+        if (!token.role && token.id) {
+          const dbUser = await prisma.user.findUnique({
+            where: { id: token.id as string },
+            select: { role: true, institution: true, npi: true, fhirPractitionerId: true, onboardingComplete: true },
+          })
+          if (dbUser) {
+            token.role = dbUser.role
+            token.institution = dbUser.institution
+            token.npi = dbUser.npi
+            token.fhirPractitionerId = dbUser.fhirPractitionerId
+            token.onboardingComplete = dbUser.onboardingComplete
+          }
+        }
       } else if (trigger === "update" && token.id) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const data = session as any
