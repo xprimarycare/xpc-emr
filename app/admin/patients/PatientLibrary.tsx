@@ -1,10 +1,11 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
-import { Search, UserPlus, Copy, X } from 'lucide-react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { Search, UserPlus, Copy, X, Trash2, AlertTriangle } from 'lucide-react';
 import { AssignCaseDialog } from '@/components/dialogs/AssignCaseDialog';
 import { DuplicatePatientDialog } from '@/components/dialogs/DuplicatePatientDialog';
 import { AssignmentsTable } from './AssignmentsTable';
+import type { DuplicatePatientEntry } from '@/app/api/case-library/duplicates/route';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -22,6 +23,8 @@ interface FhirPatientRow {
 interface DialogTarget {
   patientFhirId: string;
   patientName: string;
+  patientAge?: string;
+  patientGender?: string;
 }
 
 type TagCategory = 'conditions' | 'competencies' | 'contexts';
@@ -164,6 +167,14 @@ export function PatientLibrary({ asPanel = false, onOpen }: { asPanel?: boolean;
   const [drawerPatient, setDrawerPatient] = useState<FhirPatientRow | null>(null);
   const [patientTagsMap, setPatientTagsMap] = useState<Record<string, PatientTags>>({});
 
+  // Duplicate detection
+  const [duplicateGroups, setDuplicateGroups] = useState<DuplicatePatientEntry[][]>([]);
+  const [scanningDuplicates, setScanningDuplicates] = useState(false);
+  const duplicateFhirIds = useMemo(
+    () => new Set(duplicateGroups.flat().map((p) => p.fhirId)),
+    [duplicateGroups]
+  );
+
   // ---------------------------------------------------------------------------
   // Data fetching
   // ---------------------------------------------------------------------------
@@ -225,6 +236,44 @@ export function PatientLibrary({ asPanel = false, onOpen }: { asPanel?: boolean;
     setDrawerPatient(null);
   }, []);
 
+  const scanForDuplicates = async () => {
+    setScanningDuplicates(true);
+    try {
+      const res = await fetch('/api/case-library/duplicates');
+      if (!res.ok) throw new Error('Scan failed');
+      const { duplicates, truncated } = await res.json();
+      setDuplicateGroups(duplicates);
+      if (truncated) {
+        alert('Warning: more than 500 patients exist. Duplicate scan only covers the first 500.');
+      }
+    } catch (err) {
+      console.error('Duplicate scan failed:', err);
+      alert('Failed to scan for duplicates. Please try again.');
+    } finally {
+      setScanningDuplicates(false);
+    }
+  };
+
+  const deletePatient = async (fhirId: string) => {
+    if (!confirm('Permanently delete this patient? This cannot be undone.')) return;
+    try {
+      const res = await fetch(`/api/fhir/patient?id=${fhirId}`, { method: 'DELETE' });
+      if (res.ok) {
+        setPatients((prev) => prev.filter((p) => p.fhirId !== fhirId));
+        setDuplicateGroups((prev) =>
+          prev
+            .map((g) => g.filter((p) => p.fhirId !== fhirId))
+            .filter((g) => g.length >= 2)
+        );
+      } else {
+        const data = await res.json().catch(() => ({}));
+        alert(data.error || 'Failed to delete patient. Please try again.');
+      }
+    } catch {
+      alert('Network error. Failed to delete patient.');
+    }
+  };
+
   // Fetch on mount and on debounced search change
   useEffect(() => {
     const timeout = setTimeout(() => fetchPatients(searchQuery), 300);
@@ -258,20 +307,10 @@ export function PatientLibrary({ asPanel = false, onOpen }: { asPanel?: boolean;
 
   return (
     <div className={asPanel ? '' : 'bg-white rounded-lg border overflow-hidden'}>
-      {/* Header */}
-      <div className="px-6 pt-6 pb-4">
-        <h1 className="text-xl font-semibold text-gray-900">
-          Patient Library
-        </h1>
-        <p className="text-sm text-gray-500 mt-1">
-          Browse and manage all patients
-        </p>
-      </div>
-
-      {/* Tabs */}
-      <div className="px-6 border-b border-gray-200 flex items-center gap-6">
+      {/* Tabs + toolbar */}
+      <div className="px-6 border-b border-gray-200 flex items-center gap-4">
         <button
-          onClick={() => setActiveTab('cases')}
+          onClick={() => { setActiveTab('cases'); setSelectedIds(new Set()); }}
           className={`-mb-px py-3 text-sm font-medium border-b-2 transition-colors ${
             activeTab === 'cases'
               ? 'text-gray-900 border-gray-900'
@@ -281,7 +320,7 @@ export function PatientLibrary({ asPanel = false, onOpen }: { asPanel?: boolean;
           Cases
         </button>
         <button
-          onClick={() => setActiveTab('assignments')}
+          onClick={() => { setActiveTab('assignments'); setSelectedIds(new Set()); }}
           className={`-mb-px py-3 text-sm font-medium border-b-2 transition-colors ${
             activeTab === 'assignments'
               ? 'text-gray-900 border-gray-900'
@@ -290,6 +329,51 @@ export function PatientLibrary({ asPanel = false, onOpen }: { asPanel?: boolean;
         >
           Assignments
         </button>
+
+        {activeTab === 'cases' && (
+          <>
+            <div className="flex-grow" />
+            <div className="relative py-2">
+              <Search className="absolute inset-y-0 left-3 my-auto h-4 w-4 text-gray-400 pointer-events-none" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search patients by name..."
+                className="pl-9 pr-4 py-1.5 border border-gray-200 rounded-md text-sm focus:outline-none focus:border-gray-400 bg-white w-64"
+              />
+            </div>
+            <button
+              disabled={selectedIds.size === 0}
+              onClick={() => {
+                const first = patients.find((p) => selectedIds.has(p.fhirId));
+                if (first) {
+                  setAssignTarget({
+                    patientFhirId: first.fhirId,
+                    patientName: first.name,
+                  });
+                }
+              }}
+              className="flex-shrink-0 flex items-center gap-1.5 text-sm px-3 py-1.5 font-medium text-gray-700 border border-gray-200 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed rounded-md bg-white"
+            >
+              <UserPlus className="h-4 w-4" />
+              Assign{selectedIds.size > 0 ? ` (${selectedIds.size})` : ''}
+            </button>
+            <button
+              onClick={scanForDuplicates}
+              disabled={scanningDuplicates}
+              className="flex-shrink-0 flex items-center gap-1.5 text-sm px-3 py-1.5 font-medium text-gray-700 border border-gray-200 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed rounded-md bg-white"
+            >
+              <AlertTriangle className="h-4 w-4" />
+              {scanningDuplicates ? 'Scanning...' : 'Find Duplicates'}
+              {duplicateGroups.length > 0 && (
+                <span className="ml-0.5 inline-flex items-center justify-center h-4 w-4 rounded-full bg-red-500 text-white text-xs">
+                  {duplicateGroups.flat().length}
+                </span>
+              )}
+            </button>
+          </>
+        )}
       </div>
 
       {/* Assignments tab */}
@@ -298,38 +382,52 @@ export function PatientLibrary({ asPanel = false, onOpen }: { asPanel?: boolean;
       {/* Cases tab content */}
       {activeTab === 'cases' && <>
 
-      {/* Search bar + Assign Selected */}
-      <div className="px-6 pt-4 pb-4 flex items-center gap-3">
-        <div className="relative flex-grow">
-          <Search className="absolute inset-y-0 left-3 my-auto h-4 w-4 text-gray-400 pointer-events-none" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search patients by name..."
-            className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-md text-sm focus:outline-none focus:border-gray-400 bg-white"
-          />
+      {/* Duplicate groups view */}
+      {duplicateGroups.length > 0 && (
+        <div className="px-6 pb-6">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-sm font-medium text-amber-800">
+              <AlertTriangle className="inline h-4 w-4 mr-1 text-amber-500" />
+              {duplicateGroups.flat().length} patients in {duplicateGroups.length} duplicate group{duplicateGroups.length !== 1 ? 's' : ''} (same name + DOB)
+            </span>
+            <button
+              onClick={() => setDuplicateGroups([])}
+              className="text-xs text-gray-500 hover:text-gray-700 underline"
+            >
+              Back to all patients
+            </button>
+          </div>
+          <div className="space-y-3">
+            {duplicateGroups.map((group, gi) => (
+              <div key={gi} className="border border-red-200 rounded-lg overflow-hidden">
+                <div className="px-3 py-1.5 bg-red-50 text-xs font-medium text-red-700">
+                  Group {gi + 1} — {group[0].name} · {group[0].birthDate}
+                </div>
+                <div className="divide-y divide-gray-100">
+                    {group.map((p) => (
+                      <div key={p.fhirId} className="flex items-center justify-between px-4 py-2.5 hover:bg-gray-50">
+                        <div>
+                          <div className="text-sm font-medium text-gray-900">{p.name}</div>
+                          <div className="text-xs text-gray-500">{[p.birthDate, p.gender].filter(Boolean).join(' · ')}</div>
+                        </div>
+                        <button
+                          onClick={() => deletePatient(p.fhirId)}
+                          className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded"
+                          title="Delete this duplicate"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    ))}
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
-        <button
-          disabled={selectedIds.size === 0}
-          onClick={() => {
-            const first = patients.find((p) => selectedIds.has(p.fhirId));
-            if (first) {
-              setAssignTarget({
-                patientFhirId: first.fhirId,
-                patientName: first.name,
-              });
-            }
-          }}
-          className="flex-shrink-0 flex items-center gap-1.5 text-sm px-3 py-2 font-medium text-gray-700 border border-gray-200 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed rounded-md bg-white"
-        >
-          <UserPlus className="h-4 w-4" />
-          Assign{selectedIds.size > 0 ? ` (${selectedIds.size})` : ''}
-        </button>
-      </div>
+      )}
 
-      {/* Data Table */}
-      <div className="p-6 overflow-x-auto">
+      {/* Data Table — hidden while duplicate view is active */}
+      <div className={`p-6 overflow-x-auto ${duplicateGroups.length > 0 ? 'hidden' : ''}`}>
           {loading && (
             <div className="text-center py-12 text-sm text-gray-400">
               Loading patients...
@@ -394,11 +492,18 @@ export function PatientLibrary({ asPanel = false, onOpen }: { asPanel?: boolean;
                       </td>
                       <td className="px-4 py-3">
                         <button
-                          onClick={() => setDrawerPatient(p)}
+                          onClick={() => onOpen?.(p.fhirId, p.name)}
                           className="text-left"
                         >
-                          <div className="text-sm font-semibold text-indigo-600 hover:text-indigo-800">
-                            {p.name}
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-sm font-semibold text-indigo-600 hover:text-indigo-800">
+                              {p.name}
+                            </span>
+                            {duplicateFhirIds.has(p.fhirId) && (
+                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-red-100 text-red-700">
+                                Duplicate
+                              </span>
+                            )}
                           </div>
                           <div className="text-sm text-gray-500">
                             {[p.age, p.gender?.charAt(0)]
@@ -407,25 +512,34 @@ export function PatientLibrary({ asPanel = false, onOpen }: { asPanel?: boolean;
                           </div>
                         </button>
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="px-4 py-3 cursor-pointer hover:bg-blue-50" onClick={() => setDrawerPatient(p)}>
                         <div className="flex flex-wrap gap-1">
                           {(patientTagsMap[p.fhirId]?.conditions ?? []).map((t) => (
                             <span key={t} className="px-2 py-0.5 rounded-full text-xs bg-blue-100 text-blue-800">{t}</span>
                           ))}
+                          {(patientTagsMap[p.fhirId]?.conditions ?? []).length === 0 && (
+                            <span className="text-xs text-gray-300 italic">Add...</span>
+                          )}
                         </div>
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="px-4 py-3 cursor-pointer hover:bg-green-50" onClick={() => setDrawerPatient(p)}>
                         <div className="flex flex-wrap gap-1">
                           {(patientTagsMap[p.fhirId]?.competencies ?? []).map((t) => (
                             <span key={t} className="px-2 py-0.5 rounded-full text-xs bg-green-100 text-green-800">{t}</span>
                           ))}
+                          {(patientTagsMap[p.fhirId]?.competencies ?? []).length === 0 && (
+                            <span className="text-xs text-gray-300 italic">Add...</span>
+                          )}
                         </div>
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="px-4 py-3 cursor-pointer hover:bg-purple-50" onClick={() => setDrawerPatient(p)}>
                         <div className="flex flex-wrap gap-1">
                           {(patientTagsMap[p.fhirId]?.contexts ?? []).map((t) => (
                             <span key={t} className="px-2 py-0.5 rounded-full text-xs bg-purple-100 text-purple-800">{t}</span>
                           ))}
+                          {(patientTagsMap[p.fhirId]?.contexts ?? []).length === 0 && (
+                            <span className="text-xs text-gray-300 italic">Add...</span>
+                          )}
                         </div>
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-center">
@@ -447,6 +561,8 @@ export function PatientLibrary({ asPanel = false, onOpen }: { asPanel?: boolean;
                               setDuplicateTarget({
                                 patientFhirId: p.fhirId,
                                 patientName: p.name,
+                                patientAge: p.age,
+                                patientGender: p.gender,
                               })
                             }
                             className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-50 rounded"
@@ -454,6 +570,15 @@ export function PatientLibrary({ asPanel = false, onOpen }: { asPanel?: boolean;
                           >
                             <Copy className="h-4 w-4" />
                           </button>
+                          {duplicateFhirIds.has(p.fhirId) && (
+                            <button
+                              onClick={() => deletePatient(p.fhirId)}
+                              className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded"
+                              title="Delete duplicate"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -489,6 +614,8 @@ export function PatientLibrary({ asPanel = false, onOpen }: { asPanel?: boolean;
           }}
           patientFhirId={duplicateTarget.patientFhirId}
           patientName={duplicateTarget.patientName}
+          patientAge={duplicateTarget.patientAge}
+          patientGender={duplicateTarget.patientGender}
         />
       )}
 
@@ -528,7 +655,7 @@ export function PatientLibrary({ asPanel = false, onOpen }: { asPanel?: boolean;
                     </button>
                     <button
                       onClick={() => {
-                        const target = { patientFhirId: drawerPatient.fhirId, patientName: drawerPatient.name };
+                        const target = { patientFhirId: drawerPatient.fhirId, patientName: drawerPatient.name, patientAge: drawerPatient.age, patientGender: drawerPatient.gender };
                         closeDrawer();
                         setDuplicateTarget(target);
                       }}
