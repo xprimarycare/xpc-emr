@@ -1,3 +1,10 @@
+export const UserRole = {
+  ADMIN: 'admin',
+  USER: 'user',
+} as const;
+
+export type UserRoleValue = (typeof UserRole)[keyof typeof UserRole];
+
 export const CaseStatus = {
   WAITING_ROOM: 'waiting_room',
   IN_PROGRESS: 'in_progress',

@@ -3,6 +3,7 @@ import { requireAuth, isSession } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { phenomlClient } from "@/lib/phenoml/client";
 import { mapFhirBundleToEncounters } from "@/lib/phenoml/fhir-mapper";
+import { UserRole } from "@/lib/constants/case-status";
 
 const providerId = process.env.PHENOML_FHIR_PROVIDER_ID;
 
@@ -71,7 +72,7 @@ export async function GET(request: NextRequest) {
 
   const session = authResult;
   const userId = session.user.id;
-  const isAdmin = session.user.role === "admin";
+  const isAdmin = session.user.role === UserRole.ADMIN;
 
   if (!providerId) {
     return NextResponse.json(

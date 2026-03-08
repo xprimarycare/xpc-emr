@@ -1,5 +1,6 @@
 import { auth } from "@/auth"
 import { redirect } from "next/navigation"
+import { UserRole } from "@/lib/constants/case-status"
 import Link from "next/link"
 import { SignOutButton } from "./SignOutButton"
 import { ProfileForm } from "./ProfileForm"
@@ -45,7 +46,7 @@ export default async function AccountPage() {
               </h1>
               <p className="text-sm text-gray-500">{user.email}</p>
               <span className="inline-block mt-1 text-[11px] font-medium uppercase tracking-wide px-2 py-0.5 rounded bg-gray-100 text-gray-500">
-                {user.role === 'admin' ? 'Admin' : 'Clinician'}
+                {user.role === UserRole.ADMIN ? 'Admin' : 'Clinician'}
               </span>
             </div>
           </div>
@@ -54,7 +55,7 @@ export default async function AccountPage() {
 
           <ProfileForm institution={user.institution} npi={user.npi} />
 
-          {user.role === "admin" && (
+          {user.role === UserRole.ADMIN && (
             <>
               <hr className="border-gray-200" />
               <Link
