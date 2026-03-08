@@ -39,24 +39,20 @@ export async function GET(request: NextRequest) {
   return NextResponse.json(grouped);
 }
 
+const TAG_VALUE_MAX = 200;
+
 // PUT /api/patient-tags
 // Replaces all tags for a patient in a given category
 export async function PUT(request: NextRequest) {
-  console.log("[patient-tags] PUT called");
   const authResult = await requireAuth();
-  if (!isSession(authResult)) {
-    console.log("[patient-tags] PUT auth failed");
-    return authResult;
-  }
+  if (!isSession(authResult)) return authResult;
 
   if (authResult.user.role !== "admin") {
-    console.log("[patient-tags] PUT forbidden, role:", authResult.user.role);
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   try {
     const body = await request.json();
-    console.log("[patient-tags] PUT body:", JSON.stringify(body));
     const { patientFhirId, tags } = body;
 
     if (!patientFhirId?.trim()) {
@@ -68,31 +64,30 @@ export async function PUT(request: NextRequest) {
 
     const pid = patientFhirId.trim();
 
-    // Replace tags for each provided category
-    for (const category of ["conditions", "competencies", "contexts"] as const) {
-      if (!(category in tags)) continue;
+    // Replace tags for each provided category inside a single transaction
+    await prisma.$transaction(async (tx) => {
+      for (const category of ["conditions", "competencies", "contexts"] as const) {
+        if (!(category in tags)) continue;
 
-      const values: string[] = tags[category];
-      console.log(`[patient-tags] ${category}: delete existing, create ${values.length} new`);
+        const values: string[] = tags[category];
 
-      // Delete existing tags for this category
-      await prisma.patientTag.deleteMany({
-        where: { patientFhirId: pid, category },
-      });
+        // Validate each value
+        for (const value of values) {
+          if (typeof value !== "string" || value.length > TAG_VALUE_MAX) {
+            throw new Error(`Tag value exceeds ${TAG_VALUE_MAX} characters`);
+          }
+        }
 
-      // Insert new tags
-      if (values.length > 0) {
-        await prisma.patientTag.createMany({
-          data: values.map((value: string) => ({
-            patientFhirId: pid,
-            category,
-            value,
-          })),
-        });
+        await tx.patientTag.deleteMany({ where: { patientFhirId: pid, category } });
+
+        if (values.length > 0) {
+          await tx.patientTag.createMany({
+            data: values.map((value) => ({ patientFhirId: pid, category, value })),
+          });
+        }
       }
-    }
+    });
 
-    console.log("[patient-tags] PUT success for", pid);
     return NextResponse.json({ ok: true });
   } catch (error) {
     console.error("Patient tags API error:", error);

@@ -20,7 +20,8 @@ const registerSchema = z.object({
     .email("Invalid email address"),
   password: z
     .string()
-    .min(8, "Password must be at least 8 characters"),
+    .min(8, "Password must be at least 8 characters")
+    .max(72, "Password must be 72 characters or fewer"),
 })
 
 export async function register(
