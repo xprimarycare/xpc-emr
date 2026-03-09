@@ -3,6 +3,7 @@ import { requireAuth, isSession } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { isLocalBackend } from "@/lib/emr-backend";
 import { getPatientIdField } from "@/lib/patient-id";
+import { logger } from "@/lib/logger";
 
 // GET /api/patient-tags?patientFhirIds=id1,id2,...
 // Returns tags grouped by patient and category
@@ -30,7 +31,8 @@ export async function GET(request: NextRequest) {
   // Group by patient ID → { conditions: [], competencies: [], contexts: [] }
   const grouped: Record<string, { conditions: string[]; competencies: string[]; contexts: string[] }> = {};
   for (const tag of tags) {
-    const key = (isLocalBackend() ? tag.patientLocalId : tag.patientFhirId) || tag.patientFhirId;
+    const key = (isLocalBackend() ? tag.patientLocalId : tag.patientFhirId) ?? tag.patientFhirId ?? tag.patientLocalId;
+    if (!key) continue;
     if (!grouped[key]) {
       grouped[key] = { conditions: [], competencies: [], contexts: [] };
     }
@@ -76,7 +78,6 @@ export async function PUT(request: NextRequest) {
 
         const values: string[] = tags[category];
 
-        // Validate each value
         for (const value of values) {
           if (typeof value !== "string" || value.length > TAG_VALUE_MAX) {
             throw new Error(`Tag value exceeds ${TAG_VALUE_MAX} characters`);
@@ -88,8 +89,9 @@ export async function PUT(request: NextRequest) {
         if (values.length > 0) {
           await tx.patientTag.createMany({
             data: values.map((value) => ({
-              patientFhirId: isLocalBackend() ? pid : pid,
-              ...(isLocalBackend() ? { patientLocalId: pid } : {}),
+              ...(isLocalBackend()
+                ? { patientLocalId: pid }
+                : { patientFhirId: pid }),
               category,
               value,
             })),
@@ -100,7 +102,7 @@ export async function PUT(request: NextRequest) {
 
     return NextResponse.json({ ok: true });
   } catch (error) {
-    console.error("Patient tags API error:", error);
+    logger.error("Patient tags API error", error);
     return NextResponse.json({ error: "Failed to save tags" }, { status: 500 });
   }
 }

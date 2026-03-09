@@ -5,20 +5,9 @@ import { mapFhirBundleToEncounters } from "@/lib/phenoml/fhir-mapper";
 import { UserRole } from "@/lib/constants/case-status";
 import { isLocalBackend } from "@/lib/emr-backend";
 import { prismaClinical } from "@/lib/prisma-clinical";
-import { getPatientIdField } from "@/lib/patient-id";
+import { getClinicalPatientId } from "@/lib/patient-id";
 
 const providerId = process.env.PHENOML_FHIR_PROVIDER_ID;
-
-/** Get the clinical DB patient ID from a UserPatient record based on the active backend.
- *  Falls back to whichever ID is available when the preferred one is null
- *  (e.g. records created under Medplum mode but now running in local mode). */
-function getClinicalPatientId(assignment: { patientFhirId: string; patientLocalId: string | null }): string {
-  const field = getPatientIdField();
-  const value = assignment[field];
-  if (value) return value;
-  // Fallback: use whichever ID is available
-  return assignment.patientLocalId || assignment.patientFhirId;
-}
 
 async function fetchPatientEncounters(patientId: string) {
   if (isLocalBackend()) {
@@ -193,7 +182,10 @@ export async function GET(request: NextRequest) {
       }
 
       const assignments = await prisma.userPatient.findMany({
-        where: { userId: targetUserId },
+        where: {
+          userId: targetUserId,
+          ...(isLocalBackend() ? { patientLocalId: { not: null } } : {}),
+        },
       });
 
       const results = await Promise.all(
@@ -235,6 +227,7 @@ export async function GET(request: NextRequest) {
       }
 
       const assignments = await prisma.userPatient.findMany({
+        where: isLocalBackend() ? { patientLocalId: { not: null } } : undefined,
         include: {
           user: { select: { name: true, email: true } },
         },

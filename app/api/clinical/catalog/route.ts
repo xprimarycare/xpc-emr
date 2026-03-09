@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { requireAuth, isSession } from "@/lib/auth-helpers"
 import { prismaClinical } from "@/lib/prisma-clinical"
+import { logger } from "@/lib/logger"
 
 // GET /api/clinical/catalog?text={search}&category={category}&limit={n}
 // Replaces construe/semantic search for code resolution
@@ -42,7 +43,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ codes })
   } catch (error) {
-    console.error("Clinical catalog search error:", error)
+    logger.error("Clinical catalog search error", error)
     return NextResponse.json({ error: "Failed to search catalog" }, { status: 500 })
   }
 }

@@ -1,6 +1,15 @@
 import { NextRequest, NextResponse } from "next/server"
+import { z } from "zod"
 import { requireAuth, isSession } from "@/lib/auth-helpers"
 import { prismaClinical } from "@/lib/prisma-clinical"
+import { logger } from "@/lib/logger"
+
+const cloneSchema = z.object({
+  sourcePatientId: z.string().min(1),
+  newName: z.string().optional(),
+  newDob: z.string().optional(),
+  newSex: z.string().optional(),
+})
 
 // POST /api/clinical/clone - Duplicate a patient with all related resources (admin only)
 export async function POST(request: NextRequest) {
@@ -12,11 +21,15 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const { sourcePatientId, newName, newDob, newSex } = await request.json()
-
-    if (!sourcePatientId) {
-      return NextResponse.json({ error: "sourcePatientId is required" }, { status: 400 })
+    const body = await request.json()
+    const parsed = cloneSchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: "Validation failed", details: parsed.error.flatten().fieldErrors },
+        { status: 400 },
+      )
     }
+    const { sourcePatientId, newName, newDob, newSex } = parsed.data
 
     const source = await prismaClinical.patient.findUnique({
       where: { id: sourcePatientId },
@@ -215,7 +228,7 @@ export async function POST(request: NextRequest) {
       },
     })
   } catch (error) {
-    console.error("Clinical clone error:", error)
+    logger.error("Clinical clone error", error)
     return NextResponse.json({ error: "Failed to clone patient" }, { status: 500 })
   }
 }

@@ -1,89 +1,23 @@
-import { NextRequest, NextResponse } from "next/server"
-import { requireAuth, isSession } from "@/lib/auth-helpers"
-import { prismaClinical } from "@/lib/prisma-clinical"
-import { requirePatientAccess } from "@/lib/clinical-auth"
+import { z } from "zod"
+import { createClinicalCrudHandlers } from "@/lib/clinical-crud-factory"
 
-// GET /api/clinical/social-history?patient={id}
-export async function GET(request: NextRequest) {
-  const authResult = await requireAuth()
-  if (!isSession(authResult)) return authResult
+const socialHistorySchema = z.object({
+  patientId: z.string().min(1),
+  name: z.string().optional(),
+  status: z.string().optional(),
+  value: z.string().optional(),
+  effectiveDate: z.string().optional(),
+  codingSystem: z.string().optional(),
+  codingCode: z.string().optional(),
+  codingDisplay: z.string().optional(),
+  valueCodingSystem: z.string().optional(),
+  valueCodingCode: z.string().optional(),
+  valueCodingDisplay: z.string().optional(),
+  note: z.string().optional(),
+})
 
-  try {
-    const patientId = request.nextUrl.searchParams.get("patient")
-    if (!patientId) {
-      return NextResponse.json({ error: "patient parameter is required" }, { status: 400 })
-    }
-
-    const forbidden = await requirePatientAccess(authResult, patientId)
-    if (forbidden) return forbidden
-
-    const items = await prismaClinical.socialHistory.findMany({
-      where: { patientId },
-      orderBy: { createdAt: "desc" },
-    })
-
-    return NextResponse.json({ items, total: items.length })
-  } catch (error) {
-    console.error("Clinical social history search error:", error)
-    return NextResponse.json({ error: "Failed to fetch social history" }, { status: 500 })
-  }
-}
-
-// POST /api/clinical/social-history - Create a new social history entry
-export async function POST(request: NextRequest) {
-  const authResult = await requireAuth()
-  if (!isSession(authResult)) return authResult
-
-  try {
-    const body = await request.json()
-    if (body.patientId) {
-      const forbidden = await requirePatientAccess(authResult, body.patientId)
-      if (forbidden) return forbidden
-    }
-    const item = await prismaClinical.socialHistory.create({ data: body })
-    return NextResponse.json({ id: item.id })
-  } catch (error) {
-    console.error("Clinical social history create error:", error)
-    return NextResponse.json({ error: "Failed to create social history" }, { status: 500 })
-  }
-}
-
-// PUT /api/clinical/social-history - Update a social history entry
-export async function PUT(request: NextRequest) {
-  const authResult = await requireAuth()
-  if (!isSession(authResult)) return authResult
-
-  try {
-    const body = await request.json()
-    const { id, ...data } = body
-
-    if (!id) {
-      return NextResponse.json({ error: "SocialHistory ID is required" }, { status: 400 })
-    }
-
-    const item = await prismaClinical.socialHistory.update({ where: { id }, data })
-    return NextResponse.json(item)
-  } catch (error) {
-    console.error("Clinical social history update error:", error)
-    return NextResponse.json({ error: "Failed to update social history" }, { status: 500 })
-  }
-}
-
-// DELETE /api/clinical/social-history?id={id}
-export async function DELETE(request: NextRequest) {
-  const authResult = await requireAuth()
-  if (!isSession(authResult)) return authResult
-
-  try {
-    const id = request.nextUrl.searchParams.get("id")
-    if (!id) {
-      return NextResponse.json({ error: "id parameter is required" }, { status: 400 })
-    }
-
-    await prismaClinical.socialHistory.delete({ where: { id } })
-    return NextResponse.json({ success: true })
-  } catch (error) {
-    console.error("Clinical social history delete error:", error)
-    return NextResponse.json({ error: "Failed to delete social history" }, { status: 500 })
-  }
-}
+export const { GET, POST, PUT, DELETE } = createClinicalCrudHandlers({
+  model: "socialHistory",
+  schema: socialHistorySchema,
+  label: "social history",
+})
