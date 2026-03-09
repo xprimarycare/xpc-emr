@@ -15,7 +15,7 @@ export function RichTextEditor() {
     position: { top: number; left: number };
   }>({ show: false, query: '', position: { top: 0, left: 0 } });
 
-  const activeTab = activePatient?.tabs.find(t => t.id === activeTabId);
+  const activeTab = activePatient?.tabs?.find(t => t.id === activeTabId);
 
   useEffect(() => {
     if (editorRef.current && activeTab && activeTabId) {

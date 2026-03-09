@@ -26,7 +26,7 @@ interface PageMetadataBarProps {
 export function PageMetadataBar({ showNote, onToggleNote, labView, onLabViewChange, labCounts, imagingView, onImagingViewChange, imagingCounts, referralView, onReferralViewChange, referralCounts, onRefresh }: PageMetadataBarProps) {
   const { activePatient } = usePatient();
   const { activeTabId, tabContent } = useEditor();
-  const activeTab = activePatient?.tabs.find(t => t.id === activeTabId);
+  const activeTab = activePatient?.tabs?.find(t => t.id === activeTabId);
   const isFhirPatient = !!activePatient?.fhirId;
 
   const handleTranscription = useCallback((text: string) => {

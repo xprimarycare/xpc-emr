@@ -136,7 +136,7 @@ export function LeftSidebar() {
     if (!activePatient) return { pages: [], encounters: [], tasks: [] };
 
     const query = searchQuery.toLowerCase();
-    const filtered = activePatient.tabs.filter(tab =>
+    const filtered = (activePatient.tabs ?? []).filter(tab =>
       tab.name.toLowerCase().includes(query)
     );
 

@@ -34,7 +34,7 @@ export function EncounterMetadataBar() {
     toggleRecording,
   } = useWhisper(handleTranscription);
 
-  const activeTab = activePatient?.tabs.find(t => t.id === activeTabId);
+  const activeTab = activePatient?.tabs?.find(t => t.id === activeTabId);
 
   const [status, setStatus] = useState<SaveStatus>('idle');
   const [error, setError] = useState<string | null>(null);

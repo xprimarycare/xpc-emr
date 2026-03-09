@@ -25,7 +25,7 @@ export function NoteEditor({
     position: { top: number; left: number };
   }>({ show: false, query: '', position: { top: 0, left: 0 } });
 
-  const activeTab = activePatient?.tabs.find(t => t.id === activeTabId);
+  const activeTab = activePatient?.tabs?.find(t => t.id === activeTabId);
 
   // Load editor content when tab changes
   // Note: Content is app-controlled from PatientContext, same pattern as the existing

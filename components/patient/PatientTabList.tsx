@@ -13,7 +13,7 @@ export function PatientTabList() {
     setActivePatientId(patientId);
     // Switch to the first tab of the new patient
     const patient = patients.find(p => p.id === patientId);
-    if (patient && patient.tabs.length > 0) {
+    if (patient && patient.tabs?.length > 0) {
       setActiveTabId(patient.tabs[0].id);
     }
   };
@@ -26,7 +26,7 @@ export function PatientTabList() {
           patient={patient}
           isActive={patient.id === activePatientId}
           onClick={() => handlePatientSwitch(patient.id)}
-          onClose={patients.length > 1 ? () => removePatient(patient.id) : undefined}
+          onClose={() => removePatient(patient.id)}
         />
       ))}
     </div>

@@ -46,7 +46,7 @@ export function EditorContainer() {
   const [referralCounts, setReferralCounts] = useState({ pending: 0, completed: 0 });
   const [refreshKey, setRefreshKey] = useState(0);
 
-  const activeTab = activePatient?.tabs.find(t => t.id === activeTabId);
+  const activeTab = activePatient?.tabs?.find(t => t.id === activeTabId);
 
   const isFhirPatient = !!activePatient?.fhirId;
   const isPatientInfoTab = activeTab?.name === 'Patient Info';
