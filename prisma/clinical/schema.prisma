@@ -1,0 +1,457 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../../app/generated/prisma-clinical"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Patient {
+  id        String   @id @default(cuid())
+  name      String
+  mrn       String   @default("")
+  dob       String   @default("")
+  sex       String   @default("")
+  avatar    String?
+  summary   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  encounters      Encounter[]
+  medications     Medication[]
+  allergies       Allergy[]
+  conditions      Condition[]
+  procedures      Procedure[]
+  familyHistories FamilyHistory[]
+  vitals          Vital[]
+  socialHistories SocialHistory[]
+  labOrders       LabOrder[]
+  imagingOrders   ImagingOrder[]
+  referrals       Referral[]
+  goals           Goal[]
+  careTeamMembers CareTeamMember[]
+  tasks           Task[]
+  appointments    Appointment[]
+  threads         Thread[]
+  tabs            Tab[]
+
+  @@map("patients")
+}
+
+model Encounter {
+  id           String   @id @default(cuid())
+  patientId    String
+  status       String   @default("planned")
+  classCode    String   @default("AMB")
+  classDisplay String   @default("Ambulatory")
+  date         String
+  endDate      String?
+  noteText     String   @default("")
+  isSigned     Boolean  @default(false)
+  signedAt     String?
+  signedBy     String?
+  signedById   String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  patient Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  vitals  Vital[]
+  tasks   Task[]
+
+  @@index([patientId])
+  @@map("encounters")
+}
+
+model Medication {
+  id            String   @id @default(cuid())
+  patientId     String
+  name          String
+  dose          String   @default("")
+  route         String   @default("")
+  frequency     String   @default("")
+  status        String   @default("active")
+  authoredOn    String?
+  dosageText    String?
+  codingSystem  String?
+  codingCode    String?
+  codingDisplay String?
+  note          String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  patient Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@index([patientId])
+  @@map("medications")
+}
+
+model Allergy {
+  id                 String   @id @default(cuid())
+  patientId          String
+  substance          String
+  clinicalStatus     String   @default("active")
+  verificationStatus String   @default("unconfirmed")
+  type               String   @default("")
+  category           String   @default("")
+  criticality        String   @default("")
+  reaction           String   @default("")
+  severity           String   @default("")
+  recordedDate       String?
+  codingSystem       String?
+  codingCode         String?
+  codingDisplay      String?
+  note               String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  patient Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@index([patientId])
+  @@map("allergies")
+}
+
+model Condition {
+  id                 String   @id @default(cuid())
+  patientId          String
+  name               String
+  clinicalStatus     String   @default("active")
+  verificationStatus String   @default("unconfirmed")
+  severity           String   @default("")
+  onsetDate          String   @default("")
+  abatementDate      String   @default("")
+  recordedDate       String?
+  bodySite           String   @default("")
+  codingSystem       String?
+  codingCode         String?
+  codingDisplay      String?
+  note               String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  patient Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@index([patientId])
+  @@map("conditions")
+}
+
+model Procedure {
+  id            String   @id @default(cuid())
+  patientId     String
+  name          String
+  status        String   @default("completed")
+  performedDate String   @default("")
+  bodySite      String   @default("")
+  outcome       String   @default("")
+  codingSystem  String?
+  codingCode    String?
+  codingDisplay String?
+  note          String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  patient Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@index([patientId])
+  @@map("procedures")
+}
+
+model FamilyHistory {
+  id                  String   @id @default(cuid())
+  patientId           String
+  name                String
+  relationship        String
+  relationshipDisplay String   @default("")
+  status              String   @default("completed")
+  deceased            Boolean  @default(false)
+  deceasedAge         String?
+  note                String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  patient    Patient                  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  conditions FamilyHistoryCondition[]
+
+  @@index([patientId])
+  @@map("family_histories")
+}
+
+model FamilyHistoryCondition {
+  id                 String  @id @default(cuid())
+  familyHistoryId    String
+  name               String
+  outcome            String?
+  onsetAge           String?
+  contributedToDeath Boolean @default(false)
+  codingSystem       String?
+  codingCode         String?
+  codingDisplay      String?
+  note               String?
+
+  familyHistory FamilyHistory @relation(fields: [familyHistoryId], references: [id], onDelete: Cascade)
+
+  @@index([familyHistoryId])
+  @@map("family_history_conditions")
+}
+
+model Vital {
+  id                String   @id @default(cuid())
+  patientId         String
+  encounterId       String?
+  name              String
+  loincCode         String   @default("")
+  loincDisplay      String   @default("")
+  status            String   @default("final")
+  effectiveDateTime String
+  value             Float?
+  unit              String?
+  systolic          Float?
+  diastolic         Float?
+  note              String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  patient   Patient    @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  encounter Encounter? @relation(fields: [encounterId], references: [id], onDelete: SetNull)
+
+  @@index([patientId])
+  @@index([encounterId])
+  @@map("vitals")
+}
+
+model SocialHistory {
+  id                 String   @id @default(cuid())
+  patientId          String
+  name               String
+  status             String   @default("final")
+  value              String   @default("")
+  effectiveDate      String   @default("")
+  codingSystem       String?
+  codingCode         String?
+  codingDisplay      String?
+  valueCodingSystem  String?
+  valueCodingCode    String?
+  valueCodingDisplay String?
+  note               String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  patient Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@index([patientId])
+  @@map("social_histories")
+}
+
+model LabOrder {
+  id           String   @id @default(cuid())
+  patientId    String
+  testName     String
+  loincCode    String   @default("")
+  loincDisplay String   @default("")
+  status       String   @default("draft")
+  priority     String   @default("routine")
+  authoredOn   String?
+  note         String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  patient Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@index([patientId])
+  @@map("lab_orders")
+}
+
+model ImagingOrder {
+  id           String   @id @default(cuid())
+  patientId    String
+  studyName    String
+  loincCode    String   @default("")
+  loincDisplay String   @default("")
+  status       String   @default("draft")
+  priority     String   @default("routine")
+  authoredOn   String?
+  note         String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  patient Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@index([patientId])
+  @@map("imaging_orders")
+}
+
+model Referral {
+  id           String   @id @default(cuid())
+  patientId    String
+  referralType String
+  status       String   @default("draft")
+  priority     String   @default("routine")
+  referredTo   String?
+  reason       String?
+  authoredOn   String?
+  note         String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  patient Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@index([patientId])
+  @@map("referrals")
+}
+
+model Goal {
+  id              String   @id @default(cuid())
+  patientId       String
+  name            String
+  lifecycleStatus String   @default("proposed")
+  expressedBy     String?
+  startDate       String?
+  codingSystem    String?
+  codingCode      String?
+  codingDisplay   String?
+  note            String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  patient Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@index([patientId])
+  @@map("goals")
+}
+
+model CareTeamMember {
+  id            String   @id @default(cuid())
+  patientId     String
+  name          String
+  role          String   @default("")
+  status        String   @default("active")
+  pcpUserId     String?
+  codingSystem  String?
+  codingCode    String?
+  codingDisplay String?
+  note          String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  patient Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@index([patientId])
+  @@map("care_team_members")
+}
+
+model Task {
+  id          String   @id @default(cuid())
+  patientId   String
+  encounterId String?
+  status      String   @default("requested")
+  intent      String   @default("order")
+  priority    String   @default("routine")
+  description String
+  dueDate     String?
+  authoredOn  String   @default("")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  patient   Patient    @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  encounter Encounter? @relation(fields: [encounterId], references: [id], onDelete: SetNull)
+
+  @@index([patientId])
+  @@index([encounterId])
+  @@map("tasks")
+}
+
+model Appointment {
+  id              String   @id @default(cuid())
+  patientId       String?
+  status          String   @default("proposed")
+  description     String   @default("")
+  start           String
+  end             String
+  appointmentType String   @default("patient-visit")
+  patientName     String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  patient Patient? @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@index([patientId])
+  @@map("appointments")
+}
+
+model Thread {
+  id        String   @id @default(cuid())
+  patientId String
+  topic     String   @default("")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  patient  Patient   @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  messages Message[]
+
+  @@index([patientId])
+  @@map("threads")
+}
+
+model Message {
+  id         String   @id @default(cuid())
+  threadId   String
+  senderType String   @default("provider")
+  senderRef  String   @default("")
+  text       String
+  sentAt     String
+  receivedAt String?
+  status     String   @default("completed")
+  createdAt  DateTime @default(now())
+
+  thread Thread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+
+  @@index([threadId])
+  @@map("messages")
+}
+
+model Tab {
+  id              String   @id @default(cuid())
+  patientId       String
+  name            String
+  content         String   @default("")
+  parentId        String?
+  isSubtab        Boolean  @default(false)
+  starred         Boolean  @default(false)
+  isVisit         Boolean  @default(false)
+  isTask          Boolean  @default(false)
+  visitDate       String?
+  section         String   @default("pages")
+  dividerPosition Float?
+  encounterId     String?
+  taskId          String?
+  isSigned        Boolean  @default(false)
+  signedAt        String?
+  signedBy        String?
+  signedById      String?
+  sortOrder       Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  patient Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@index([patientId])
+  @@map("tabs")
+}
+
+model Catalog {
+  id          String   @id @default(cuid())
+  category    String
+  name        String
+  code        String
+  codeSystem  String
+  displayName String
+  aliases     String[]
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([category, code, codeSystem])
+  @@index([category])
+  @@index([name])
+  @@map("catalog")
+}

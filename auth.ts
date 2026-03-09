@@ -23,6 +23,7 @@ declare module "next-auth" {
       institution: string | null
       npi: string | null
       fhirPractitionerId: string | null
+      xpcId: string | null
       onboardingComplete: boolean
       role: string
       originalAdminId?: string
@@ -33,6 +34,7 @@ declare module "next-auth" {
     institution: string | null
     npi: string | null
     fhirPractitionerId: string | null
+    xpcId: string | null
     onboardingComplete: boolean
     role: string
   }
@@ -81,6 +83,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           institution: user.institution,
           npi: user.npi,
           fhirPractitionerId: user.fhirPractitionerId,
+          xpcId: user.xpcId,
           onboardingComplete: user.onboardingComplete,
           role: user.role,
         }
@@ -97,19 +100,21 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         token.institution = user.institution
         token.npi = user.npi
         token.fhirPractitionerId = user.fhirPractitionerId
+        token.xpcId = user.xpcId
         token.onboardingComplete = user.onboardingComplete
         token.role = user.role
         // OAuth providers don't pass custom fields — fetch from DB if missing
         if (!token.role && token.id) {
           const dbUser = await prisma.user.findUnique({
             where: { id: token.id as string },
-            select: { role: true, institution: true, npi: true, fhirPractitionerId: true, onboardingComplete: true },
+            select: { role: true, institution: true, npi: true, fhirPractitionerId: true, xpcId: true, onboardingComplete: true },
           })
           if (dbUser) {
             token.role = dbUser.role
             token.institution = dbUser.institution
             token.npi = dbUser.npi
             token.fhirPractitionerId = dbUser.fhirPractitionerId
+            token.xpcId = dbUser.xpcId
             token.onboardingComplete = dbUser.onboardingComplete
           }
         }
@@ -122,7 +127,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           try {
             const targetUser = await prisma.user.findUnique({
               where: { id: data.impersonating as string },
-              select: { id: true, name: true, email: true, image: true, institution: true, npi: true, fhirPractitionerId: true, onboardingComplete: true, role: true },
+              select: { id: true, name: true, email: true, image: true, institution: true, npi: true, fhirPractitionerId: true, xpcId: true, onboardingComplete: true, role: true },
             })
             if (targetUser) {
               token.originalAdminId = token.id // preserve real admin id
@@ -133,6 +138,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
               token.institution = targetUser.institution
               token.npi = targetUser.npi
               token.fhirPractitionerId = targetUser.fhirPractitionerId
+              token.xpcId = targetUser.xpcId
               token.onboardingComplete = targetUser.onboardingComplete
               token.role = targetUser.role
               return token
@@ -145,7 +151,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           try {
             const adminUser = await prisma.user.findUnique({
               where: { id: token.originalAdminId as string },
-              select: { id: true, name: true, email: true, image: true, institution: true, npi: true, fhirPractitionerId: true, onboardingComplete: true, role: true },
+              select: { id: true, name: true, email: true, image: true, institution: true, npi: true, fhirPractitionerId: true, xpcId: true, onboardingComplete: true, role: true },
             })
             if (adminUser) {
               token.id = adminUser.id
@@ -155,6 +161,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
               token.institution = adminUser.institution
               token.npi = adminUser.npi
               token.fhirPractitionerId = adminUser.fhirPractitionerId
+              token.xpcId = adminUser.xpcId
               token.onboardingComplete = adminUser.onboardingComplete
               token.role = adminUser.role
               delete token.originalAdminId
@@ -172,6 +179,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                 institution: true,
                 npi: true,
                 fhirPractitionerId: true,
+                xpcId: true,
                 onboardingComplete: true,
                 role: true,
               },
@@ -180,6 +188,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
               token.institution = dbUser.institution
               token.npi = dbUser.npi
               token.fhirPractitionerId = dbUser.fhirPractitionerId
+              token.xpcId = dbUser.xpcId
               token.onboardingComplete = dbUser.onboardingComplete
               token.role = dbUser.role
             }
@@ -196,6 +205,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       session.user.institution = token.institution as string | null
       session.user.npi = token.npi as string | null
       session.user.fhirPractitionerId = token.fhirPractitionerId as string | null
+      session.user.xpcId = token.xpcId as string | null
       session.user.onboardingComplete = token.onboardingComplete as boolean
       session.user.role = token.role as string
       if (token.originalAdminId) {

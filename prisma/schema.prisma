@@ -17,6 +17,7 @@ model User {
   institution        String?
   npi                String?
   fhirPractitionerId String?
+  xpcId              String?
   role               String    @default("user")
   onboardingComplete Boolean   @default(false)
   createdAt          DateTime  @default(now())
@@ -53,31 +54,46 @@ model UserPatient {
   id                    String   @id @default(cuid())
   userId                String
   patientFhirId         String
+  patientLocalId        String?
   assignedAt            DateTime @default(now())
   status                String   @default("waiting_room")
   assignedBy            String?
   encounterFhirId       String?
+  encounterLocalId      String?
   sourceEncounterFhirId String?
   sourcePatientFhirId   String?
+  sourcePatientLocalId  String?
   includeNoteText       Boolean  @default(true)
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, patientFhirId])
+  @@unique([userId, patientLocalId])
   @@map("user_patients")
 }
 
 model PatientTag {
-  id            String @id @default(cuid())
-  patientFhirId String
-  category      String // 'conditions' | 'competencies' | 'contexts'
-  value         String
+  id             String  @id @default(cuid())
+  patientFhirId  String
+  patientLocalId String?
+  category       String // 'conditions' | 'competencies' | 'contexts'
+  value          String
 
   createdAt DateTime @default(now())
 
   @@unique([patientFhirId, category, value])
+  @@unique([patientLocalId, category, value])
   @@index([patientFhirId])
+  @@index([patientLocalId])
   @@map("patient_tags")
+}
+
+model AppConfig {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+
+  @@map("app_config")
 }
 
 model ImpersonationLog {

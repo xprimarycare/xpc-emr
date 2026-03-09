@@ -26,11 +26,11 @@ export interface Tab {
   visitDate?: string;
   section?: 'pages' | 'encounters' | 'tasks';
   dividerPosition?: number; // top panel percentage (0-100), default 50
-  /** FHIR Encounter resource ID (for encounters synced with Medplum) */
+  /** FHIR Encounter resource ID (for encounters synced with EMR) */
   encounterFhirId?: string;
-  /** FHIR ClinicalImpression resource ID (for encounter notes synced with Medplum) */
+  /** FHIR ClinicalImpression resource ID (for encounter notes synced with EMR) */
   noteFhirId?: string;
-  /** FHIR Task resource ID (for tasks synced with Medplum) */
+  /** FHIR Task resource ID (for tasks synced with EMR) */
   taskFhirId?: string;
   /** Whether the encounter note is signed */
   isSigned?: boolean;
