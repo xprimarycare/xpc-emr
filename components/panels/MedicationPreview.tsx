@@ -60,7 +60,7 @@ export function MedicationPreview({
       {status === 'confirming' && (
         <div className="flex items-center gap-2 text-sm text-blue-700 mb-3">
           <Loader2 size={16} className="animate-spin" />
-          Writing to Medplum...
+          Saving...
         </div>
       )}
 

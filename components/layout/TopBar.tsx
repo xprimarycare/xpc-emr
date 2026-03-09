@@ -2,7 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { Menu, Users, Plus, Lightbulb, MessageCircle, Calendar, Columns, BookOpen } from 'lucide-react';
+import { Menu, Users, Plus, Lightbulb, MessageCircle, Calendar, Columns, BookOpen, Settings } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/context/AuthContext';
@@ -159,6 +159,15 @@ export function TopBar() {
                 {user?.name || 'Unknown'}
               </span>
             </Link>
+            {user?.role === 'admin' && (
+              <Link
+                href="/admin"
+                className="p-1.5 hover:bg-gray-100 rounded"
+                title="Admin Settings"
+              >
+                <Settings size={18} className="text-gray-400" />
+              </Link>
+            )}
           </div>
         </div>
       </div>

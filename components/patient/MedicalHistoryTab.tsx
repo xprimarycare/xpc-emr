@@ -111,7 +111,7 @@ export function MedicalHistoryTab({ refreshKey }: { refreshKey?: number }) {
     }
   };
 
-  const handleSyncToMedplum = async () => {
+  const handleSync = async () => {
     if (!activePatient?.fhirId) return;
 
     const text = editorRef.current?.innerText || '';
@@ -135,7 +135,7 @@ export function MedicalHistoryTab({ refreshKey }: { refreshKey?: number }) {
 
     setResolvedEntries(resolved.entries);
 
-    // Step 2: Create each as a Condition in Medplum
+    // Step 2: Create each as a Condition in EMR
     setSyncStatus('syncing');
     let allSuccess = true;
 
@@ -173,7 +173,7 @@ export function MedicalHistoryTab({ refreshKey }: { refreshKey?: number }) {
       setSyncStatus('success');
       setTimeout(() => setSyncStatus('idle'), 2000);
 
-      // Re-fetch conditions list from Medplum
+      // Re-fetch conditions list from EMR
       const refreshed = await searchFhirConditions(activePatient.fhirId);
       if (!refreshed.error) {
         setConditions(refreshed.conditions);
@@ -208,13 +208,13 @@ export function MedicalHistoryTab({ refreshKey }: { refreshKey?: number }) {
 
           {status === 'success' && (
             <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-md text-sm text-green-700">
-              Saved to Medplum
+              Saved
             </div>
           )}
 
           {status === 'saving' && (
             <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-md text-sm text-blue-700">
-              Saving to Medplum...
+              Saving...
             </div>
           )}
 
@@ -228,7 +228,7 @@ export function MedicalHistoryTab({ refreshKey }: { refreshKey?: number }) {
           {/* Empty state */}
           {status !== 'loading' && conditions.length === 0 && status !== 'error' && (
             <div className="text-gray-400 text-sm text-center py-8">
-              No conditions found in Medplum
+              No conditions found in EMR
             </div>
           )}
 
@@ -236,7 +236,7 @@ export function MedicalHistoryTab({ refreshKey }: { refreshKey?: number }) {
           {conditions.length > 0 && (
             <div className="space-y-3">
               <p className="text-xs text-gray-500 mb-2">
-                {conditions.length} condition{conditions.length !== 1 ? 's' : ''} from Medplum
+                {conditions.length} condition{conditions.length !== 1 ? 's' : ''} from EMR
               </p>
               {conditions.map((condition) => (
                 <div
@@ -381,7 +381,7 @@ export function MedicalHistoryTab({ refreshKey }: { refreshKey?: number }) {
 
           {isFhirPatient && status === 'idle' && conditions.length > 0 && (
             <p className="text-xs text-gray-400 text-center mt-4">
-              Click a condition to edit · Changes will be saved to Medplum
+              Click a condition to edit · Changes will be saved to EMR
             </p>
           )}
         </div>
@@ -392,7 +392,7 @@ export function MedicalHistoryTab({ refreshKey }: { refreshKey?: number }) {
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-semibold">Add Conditions</h2>
               <button
-                onClick={handleSyncToMedplum}
+                onClick={handleSync}
                 disabled={syncStatus === 'resolving' || syncStatus === 'syncing'}
                 className="px-4 py-1.5 bg-blue-600 text-white rounded text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
@@ -400,7 +400,7 @@ export function MedicalHistoryTab({ refreshKey }: { refreshKey?: number }) {
                   ? 'Resolving...'
                   : syncStatus === 'syncing'
                     ? 'Syncing...'
-                    : 'Sync to Medplum'}
+                    : 'Sync'}
               </button>
             </div>
 
@@ -419,7 +419,7 @@ export function MedicalHistoryTab({ refreshKey }: { refreshKey?: number }) {
 
             {syncStatus === 'success' && (
               <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-md text-sm text-green-700">
-                Conditions synced to Medplum
+                Conditions synced
               </div>
             )}
 
@@ -431,7 +431,7 @@ export function MedicalHistoryTab({ refreshKey }: { refreshKey?: number }) {
 
             {syncStatus === 'syncing' && (
               <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-md text-sm text-blue-700">
-                Creating conditions in Medplum...
+                Creating conditions...
               </div>
             )}
 

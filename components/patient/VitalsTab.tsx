@@ -383,13 +383,13 @@ export function VitalsTab({ refreshKey }: { refreshKey?: number }) {
 
           {status === 'success' && (
             <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-md text-sm text-green-700">
-              Saved to Medplum
+              Saved
             </div>
           )}
 
           {status === 'saving' && (
             <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-md text-sm text-blue-700">
-              Saving to Medplum...
+              Saving...
             </div>
           )}
 
@@ -403,7 +403,7 @@ export function VitalsTab({ refreshKey }: { refreshKey?: number }) {
           {/* Empty state */}
           {status !== 'loading' && vitals.length === 0 && status !== 'error' && (
             <div className="text-gray-400 text-sm text-center py-8">
-              No vitals found in Medplum
+              No vitals found in EMR
             </div>
           )}
 
@@ -411,7 +411,7 @@ export function VitalsTab({ refreshKey }: { refreshKey?: number }) {
           {vitals.length > 0 && (
             <div className="space-y-3">
               <p className="text-xs text-gray-500 mb-2">
-                {vitals.length} vital{vitals.length !== 1 ? 's' : ''} from Medplum
+                {vitals.length} vital{vitals.length !== 1 ? 's' : ''} from EMR
               </p>
               {vitals.map((vital) => (
                 <div
@@ -556,7 +556,7 @@ export function VitalsTab({ refreshKey }: { refreshKey?: number }) {
 
           {isFhirPatient && status === 'idle' && (
             <p className="text-xs text-gray-400 text-center mt-4">
-              Changes will be saved to Medplum
+              Changes will be saved to EMR
             </p>
           )}
       </div>

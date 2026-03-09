@@ -70,7 +70,7 @@ export function PatientSearch() {
         onChange={(e) => handleChange(e.target.value)}
         onKeyDown={(e) => e.key === "Enter" && handleSearch()}
         onFocus={() => results && setIsOpen(true)}
-        placeholder="Search Medplum patients..."
+        placeholder="Search patients..."
         className="pl-9 pr-4 py-1.5 bg-gray-50 border-0 rounded-md text-sm w-full focus:outline-none focus:ring-2 focus:ring-gray-200"
       />
 
@@ -114,7 +114,7 @@ export function PatientSearch() {
                 </ul>
               )}
               <div className="px-3 py-2 bg-gray-50 text-xs text-gray-400 border-t">
-                {results.total} result(s) from Medplum
+                {results.total} result(s) from EMR
               </div>
             </>
           )}

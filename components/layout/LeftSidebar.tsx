@@ -30,7 +30,7 @@ export function LeftSidebar() {
   const loadedEncountersRef = useRef<Set<string>>(new Set());
   const loadedTasksRef = useRef<Set<string>>(new Set());
 
-  // Fetch encounters from Medplum when a FHIR patient is activated
+  // Fetch encounters from EMR when a FHIR patient is activated
   useEffect(() => {
     const patientId = activePatient?.id;
     const fhirId = activePatient?.fhirId;
@@ -88,7 +88,7 @@ export function LeftSidebar() {
     });
   }, [activePatient?.id, activePatient?.fhirId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Fetch tasks from Medplum when a FHIR patient is activated
+  // Fetch tasks from EMR when a FHIR patient is activated
   useEffect(() => {
     const patientId = activePatient?.id;
     const fhirId = activePatient?.fhirId;

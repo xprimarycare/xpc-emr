@@ -80,7 +80,7 @@ export function ImagingTab({ imagingView = 'pending', onCountsChange, refreshKey
     setEditingId(null);
     setEditForm({});
 
-    // Write to Medplum
+    // Write to EMR
     setStatus('saving');
     setError(null);
     const result = await upsertFhirImagingOrder(updated);
@@ -116,13 +116,13 @@ export function ImagingTab({ imagingView = 'pending', onCountsChange, refreshKey
 
           {status === 'success' && (
             <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-md text-sm text-green-700">
-              Saved to Medplum
+              Saved
             </div>
           )}
 
           {status === 'saving' && (
             <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-md text-sm text-blue-700">
-              Saving to Medplum...
+              Saving...
             </div>
           )}
 
@@ -144,7 +144,7 @@ export function ImagingTab({ imagingView = 'pending', onCountsChange, refreshKey
           {filteredOrders.length > 0 && (
             <div className="space-y-3">
               <p className="text-xs text-gray-500 mb-2">
-                {filteredOrders.length} {imagingView === 'pending' ? 'pending order' : 'result'}{filteredOrders.length !== 1 ? 's' : ''} from Medplum
+                {filteredOrders.length} {imagingView === 'pending' ? 'pending order' : 'result'}{filteredOrders.length !== 1 ? 's' : ''} from EMR
               </p>
               {filteredOrders.map((img) => (
                 <div
@@ -257,7 +257,7 @@ export function ImagingTab({ imagingView = 'pending', onCountsChange, refreshKey
 
           {isFhirPatient && status === 'idle' && (
             <p className="text-xs text-gray-400 text-center mt-4">
-              Changes will be saved to Medplum
+              Changes will be saved to EMR
             </p>
           )}
       </div>

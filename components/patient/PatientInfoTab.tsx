@@ -51,7 +51,7 @@ export function PatientInfoTab() {
     setErrorMessage('');
 
     if (isFhirPatient) {
-      // Existing FHIR patient — upsert to Medplum
+      // Existing FHIR patient — upsert to EMR
       const result = await upsertFhirPatient({
         ...activePatient,
         ...updates,
@@ -65,7 +65,7 @@ export function PatientInfoTab() {
         setErrorMessage(result.error || 'Unknown error');
       }
     } else {
-      // New patient — create in Medplum
+      // New patient — create in EMR
       const result = await createFhirPatient({
         name: formData.name,
         sex: formData.sex,
@@ -78,7 +78,7 @@ export function PatientInfoTab() {
         setTimeout(() => setSaveStatus('idle'), 3000);
       } else {
         setSaveStatus('error');
-        setErrorMessage(result.error || 'Failed to create patient in Medplum');
+        setErrorMessage(result.error || 'Failed to create patient in EMR');
       }
     }
   };
@@ -102,7 +102,7 @@ export function PatientInfoTab() {
 
           {saveStatus === 'success' && (
             <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-md text-sm text-green-700">
-              {isFhirPatient ? 'Saved to Medplum' : 'Created in Medplum'}
+              {isFhirPatient ? 'Saved' : 'Created'}
             </div>
           )}
 
@@ -171,7 +171,7 @@ export function PatientInfoTab() {
 
             {saveStatus === 'idle' && (
               <p className="text-xs text-muted-foreground text-center">
-                {isFhirPatient ? 'Changes will be saved to Medplum' : 'Patient will be created in Medplum'}
+                {isFhirPatient ? 'Changes will be saved to EMR' : 'Patient will be created in EMR'}
               </p>
             )}
           </form>

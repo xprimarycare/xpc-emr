@@ -324,7 +324,7 @@ export function OrdersPanel() {
       subject: { reference: `Patient/${activePatient.fhirId}` },
     };
 
-    // Remove any server-assigned id so Medplum assigns a new one
+    // Remove any server-assigned id so the backend assigns a new one
     delete resourceToWrite.id;
 
     const result = await createFhirMedication(resourceToWrite);
@@ -343,7 +343,7 @@ export function OrdersPanel() {
       clearPreview();
     } else {
       setPreviewStatus('error');
-      setPreviewError(result.error || 'Failed to write to Medplum');
+      setPreviewError(result.error || 'Failed to write to EMR');
     }
   };
 
@@ -386,7 +386,7 @@ export function OrdersPanel() {
       } : {}),
     };
 
-    // Remove any server-assigned id so Medplum assigns a new one
+    // Remove any server-assigned id so the backend assigns a new one
     delete resourceToWrite.id;
 
     const result = await createFhirReferral(resourceToWrite);
@@ -402,7 +402,7 @@ export function OrdersPanel() {
       clearReferralPreview();
     } else {
       setRefPreviewStatus('error');
-      setRefPreviewError(result.error || 'Failed to write to Medplum');
+      setRefPreviewError(result.error || 'Failed to write to EMR');
     }
   };
 
@@ -453,7 +453,7 @@ export function OrdersPanel() {
       } else {
         allSuccess = false;
         setLabPreviewStatus('error');
-        setLabPreviewError(result.error || 'Failed to write lab order to Medplum');
+        setLabPreviewError(result.error || 'Failed to write lab order to EMR');
         break;
       }
     }
@@ -517,7 +517,7 @@ export function OrdersPanel() {
       } else {
         allSuccess = false;
         setImgPreviewStatus('error');
-        setImgPreviewError(result.error || 'Failed to write imaging order to Medplum');
+        setImgPreviewError(result.error || 'Failed to write imaging order to EMR');
         break;
       }
     }
@@ -675,7 +675,7 @@ export function OrdersPanel() {
                 <div className="flex-1 min-w-0">
                   <p className="text-sm text-gray-800">{order.text}</p>
                   <p className="text-xs text-gray-500 mt-1 uppercase">
-                    {order.icon === 'confirmed' ? `${order.type} — saved to medplum` : order.type}
+                    {order.icon === 'confirmed' ? `${order.type} — saved` : order.type}
                   </p>
                 </div>
                 <button

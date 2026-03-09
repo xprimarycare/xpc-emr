@@ -186,7 +186,7 @@ export function EncounterTab() {
     };
   }
 
-  /** Persist (create or update) an AppEncounter to Medplum */
+  /** Persist (create or update) an AppEncounter to EMR */
   async function persistEncounter(appEncounter: AppEncounter) {
     setStatus('saving');
     setError(null);
@@ -220,7 +220,7 @@ export function EncounterTab() {
     }
   }
 
-  const handleSaveToMedplum = async () => {
+  const handleSave = async () => {
     const appEncounter = buildAppEncounter();
     if (!appEncounter) return;
 
@@ -326,11 +326,11 @@ export function EncounterTab() {
 
           {/* Status indicators */}
           {status === 'saving' && (
-            <span className="text-xs text-blue-600">Saving to Medplum...</span>
+            <span className="text-xs text-blue-600">Saving...</span>
           )}
           {status === 'success' && (
             <span className="text-xs text-green-600">
-              {encounterFhirId ? 'Saved to Medplum' : 'Created in Medplum'}
+              {encounterFhirId ? 'Saved' : 'Created'}
             </span>
           )}
           {status === 'error' && error && (
@@ -338,15 +338,15 @@ export function EncounterTab() {
           )}
 
           <button
-            onClick={handleSaveToMedplum}
+            onClick={handleSave}
             disabled={status === 'saving' || isSigned}
             className="px-4 py-1.5 bg-blue-600 text-white rounded text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {status === 'saving'
               ? 'Saving...'
               : encounterFhirId
-                ? 'Update in Medplum'
-                : 'Save to Medplum'}
+                ? 'Update'
+                : 'Save'}
           </button>
 
           <button
