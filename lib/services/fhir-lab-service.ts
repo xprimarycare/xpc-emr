@@ -4,6 +4,7 @@ import {
   mapFhirBundleToLabOrders,
   mapAppLabOrderToFhirServiceRequest,
 } from "@/lib/phenoml/fhir-mapper";
+import { isLocalBackendClient } from "@/lib/emr-backend";
 
 export interface ResolvedCode {
   code: string;
@@ -97,6 +98,24 @@ function sortByStarred(codes: ResolvedCode[]): ResolvedCode[] {
 export async function resolveLabCodes(
   text: string
 ): Promise<LabCodeResolveResult> {
+  if (isLocalBackendClient()) {
+    try {
+      const expandedText = expandLabAbbreviations(text);
+      const params = new URLSearchParams({ text: expandedText, category: "lab", limit: "10" });
+      const response = await fetch(`/api/clinical/catalog?${params}`);
+      const data = await response.json();
+      if (!response.ok) {
+        return { codes: [], error: data.error || "Failed to resolve lab codes" };
+      }
+      const codes: ResolvedCode[] = (data.codes || []).map(
+        (c: any) => ({ code: c.code, description: c.display })
+      );
+      return { codes: sortByStarred(codes) };
+    } catch (error) {
+      return { codes: [], error: error instanceof Error ? error.message : "Network error" };
+    }
+  }
+
   try {
     const expandedText = expandLabAbbreviations(text);
     const params = new URLSearchParams({
@@ -140,11 +159,28 @@ export interface LabOrderCreateResult {
 }
 
 /**
- * Create a new ServiceRequest (lab order) in Medplum.
+ * Create a new ServiceRequest (lab order) in EMR.
  */
 export async function createFhirLabOrder(
   fhirResource: Record<string, unknown>
 ): Promise<LabOrderCreateResult> {
+  if (isLocalBackendClient()) {
+    try {
+      const response = await fetch("/api/clinical/lab", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(fhirResource),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        return { success: false, error: data.error || "Failed to create lab order" };
+      }
+      return { success: true, fhirId: data.id };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : "Network error" };
+    }
+  }
+
   try {
     const response = await fetch("/api/fhir/service-request", {
       method: "POST",
@@ -183,6 +219,22 @@ export interface LabOrderSearchResult {
 export async function searchFhirLabOrders(
   patientFhirId: string
 ): Promise<LabOrderSearchResult> {
+  if (isLocalBackendClient()) {
+    try {
+      const response = await fetch(
+        `/api/clinical/lab?patient=${encodeURIComponent(patientFhirId)}`
+      );
+      const data = await response.json();
+      if (!response.ok) {
+        return { labOrders: [], total: 0, error: data.error || "Failed to fetch lab orders" };
+      }
+      const labOrders = (data.items || []).map((item: any) => ({ ...item, fhirId: item.id }));
+      return { labOrders, total: data.total ?? labOrders.length };
+    } catch (error) {
+      return { labOrders: [], total: 0, error: error instanceof Error ? error.message : "Network error" };
+    }
+  }
+
   try {
     const response = await fetch(
       `/api/fhir/service-request?patient=${encodeURIComponent(patientFhirId)}`
@@ -220,8 +272,25 @@ export interface LabOrderUpsertResult {
 export async function upsertFhirLabOrder(
   lab: AppLabOrder
 ): Promise<LabOrderUpsertResult> {
+  if (isLocalBackendClient()) {
+    try {
+      const response = await fetch("/api/clinical/lab", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...lab, id: lab.fhirId }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        return { success: false, error: data.error || "Failed to save lab order" };
+      }
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : "Network error" };
+    }
+  }
+
   if (!lab.fhirId) {
-    return { success: false, error: "Lab order has no FHIR ID — cannot write back to Medplum" };
+    return { success: false, error: "Lab order has no FHIR ID — cannot update without an ID" };
   }
 
   try {
@@ -241,7 +310,7 @@ export async function upsertFhirLabOrder(
     const data = await response.json();
 
     if (!response.ok) {
-      return { success: false, error: (data as any).error || "Failed to save lab order to Medplum" };
+      return { success: false, error: (data as any).error || "Failed to save lab order" };
     }
 
     return { success: true };

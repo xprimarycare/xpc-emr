@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth, isSession } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
+import { isLocalBackend } from "@/lib/emr-backend";
+import { getPatientIdField } from "@/lib/patient-id";
 
 // GET /api/patient-tags?patientFhirIds=id1,id2,...
 // Returns tags grouped by patient and category
@@ -17,22 +19,24 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "patientFhirIds required" }, { status: 400 });
   }
 
-  const patientFhirIds = ids.split(",").filter(Boolean);
+  const patientIds = ids.split(",").filter(Boolean);
+  const idField = getPatientIdField();
 
   const tags = await prisma.patientTag.findMany({
-    where: { patientFhirId: { in: patientFhirIds } },
+    where: { [idField]: { in: patientIds } },
     orderBy: { createdAt: "asc" },
   });
 
-  // Group by patientFhirId → { conditions: [], competencies: [], contexts: [] }
+  // Group by patient ID → { conditions: [], competencies: [], contexts: [] }
   const grouped: Record<string, { conditions: string[]; competencies: string[]; contexts: string[] }> = {};
   for (const tag of tags) {
-    if (!grouped[tag.patientFhirId]) {
-      grouped[tag.patientFhirId] = { conditions: [], competencies: [], contexts: [] };
+    const key = (isLocalBackend() ? tag.patientLocalId : tag.patientFhirId) || tag.patientFhirId;
+    if (!grouped[key]) {
+      grouped[key] = { conditions: [], competencies: [], contexts: [] };
     }
-    const cat = tag.category as keyof typeof grouped[string];
-    if (cat in grouped[tag.patientFhirId]) {
-      grouped[tag.patientFhirId][cat].push(tag.value);
+    const cat = tag.category as "conditions" | "competencies" | "contexts";
+    if (cat in grouped[key]) {
+      grouped[key][cat].push(tag.value);
     }
   }
 
@@ -63,6 +67,7 @@ export async function PUT(request: NextRequest) {
     }
 
     const pid = patientFhirId.trim();
+    const idField = getPatientIdField();
 
     // Replace tags for each provided category inside a single transaction
     await prisma.$transaction(async (tx) => {
@@ -78,11 +83,16 @@ export async function PUT(request: NextRequest) {
           }
         }
 
-        await tx.patientTag.deleteMany({ where: { patientFhirId: pid, category } });
+        await tx.patientTag.deleteMany({ where: { [idField]: pid, category } });
 
         if (values.length > 0) {
           await tx.patientTag.createMany({
-            data: values.map((value) => ({ patientFhirId: pid, category, value })),
+            data: values.map((value) => ({
+              patientFhirId: isLocalBackend() ? pid : pid,
+              ...(isLocalBackend() ? { patientLocalId: pid } : {}),
+              category,
+              value,
+            })),
           });
         }
       }

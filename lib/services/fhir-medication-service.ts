@@ -4,6 +4,7 @@ import {
   mapFhirBundleToMedications,
   mapAppMedicationToFhirMedRequest,
 } from "@/lib/phenoml/fhir-mapper";
+import { isLocalBackendClient } from "@/lib/emr-backend";
 
 export interface MedicationSearchResult {
   medications: AppMedication[];
@@ -12,11 +13,23 @@ export interface MedicationSearchResult {
 }
 
 /**
- * Fetch a patient's medications from Medplum via PhenoML
+ * Fetch a patient's medications from EMR
  */
 export async function searchFhirMedications(
   patientFhirId: string
 ): Promise<MedicationSearchResult> {
+  if (isLocalBackendClient()) {
+    try {
+      const response = await fetch(`/api/clinical/medication?patient=${encodeURIComponent(patientFhirId)}`);
+      if (!response.ok) return { medications: [], total: 0, error: `Error: ${response.status}` };
+      const data = await response.json();
+      const medications = (data.items || []).map((item: any) => ({ ...item, fhirId: item.id }));
+      return { medications, total: data.total ?? medications.length };
+    } catch (error) {
+      return { medications: [], total: 0, error: error instanceof Error ? error.message : "Network error" };
+    }
+  }
+
   try {
     const response = await fetch(
       `/api/fhir/medication?patient=${encodeURIComponent(patientFhirId)}`
@@ -64,11 +77,15 @@ export interface MedicationParseResult {
 
 /**
  * Parse natural language medication text via PhenoML lang2fhir.
- * Returns the raw FHIR MedicationRequest resource (not yet written to Medplum).
+ * Returns the raw FHIR MedicationRequest resource (not yet written to EMR).
  */
 export async function parseMedicationText(
   text: string
 ): Promise<MedicationParseResult> {
+  if (isLocalBackendClient()) {
+    return { resource: null }; // NLP parsing not available in local mode
+  }
+
   try {
     const response = await fetch("/api/fhir/lang2fhir", {
       method: "POST",
@@ -103,12 +120,30 @@ export interface MedicationCreateResult {
 }
 
 /**
- * Create a new MedicationRequest in Medplum.
+ * Create a new MedicationRequest in EMR.
  * Accepts a raw FHIR resource (from lang2fhir parse) with patient reference injected.
  */
 export async function createFhirMedication(
   fhirResource: Record<string, unknown>
 ): Promise<MedicationCreateResult> {
+  if (isLocalBackendClient()) {
+    try {
+      const response = await fetch("/api/clinical/medication", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(fhirResource),
+      });
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        return { success: false, error: (data as any).error || `Error: ${response.status}` };
+      }
+      const data = await response.json();
+      return { success: true, fhirId: data.id };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : "Network error" };
+    }
+  }
+
   try {
     const response = await fetch("/api/fhir/medication", {
       method: "POST",
@@ -142,16 +177,34 @@ export interface MedicationUpsertResult {
 }
 
 /**
- * Write a medication back to Medplum via PUT upsert.
+ * Write a medication back via PUT upsert.
  */
 export async function upsertFhirMedication(
   med: AppMedication,
   patientFhirId: string
 ): Promise<MedicationUpsertResult> {
+  if (isLocalBackendClient()) {
+    if (!med.fhirId) return { success: false, error: "Medication has no ID" };
+    try {
+      const response = await fetch("/api/clinical/medication", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...med, id: med.fhirId, patientId: patientFhirId }),
+      });
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        return { success: false, error: (data as any).error || `Error: ${response.status}` };
+      }
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : "Network error" };
+    }
+  }
+
   if (!med.fhirId) {
     return {
       success: false,
-      error: "Medication has no FHIR ID - cannot write back to Medplum",
+      error: "Medication has no FHIR ID - cannot update without an ID",
     };
   }
 
@@ -174,7 +227,7 @@ export async function upsertFhirMedication(
     if (!response.ok) {
       return {
         success: false,
-        error: data.error || "Failed to save medication to Medplum",
+        error: data.error || "Failed to save medication",
       };
     }
 

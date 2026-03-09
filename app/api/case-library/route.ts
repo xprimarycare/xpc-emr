@@ -1,21 +1,56 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth, isSession } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
-import { phenomlClient } from "@/lib/phenoml/client";
 import { mapFhirBundleToEncounters } from "@/lib/phenoml/fhir-mapper";
 import { UserRole } from "@/lib/constants/case-status";
+import { isLocalBackend } from "@/lib/emr-backend";
+import { prismaClinical } from "@/lib/prisma-clinical";
+import { getPatientIdField } from "@/lib/patient-id";
 
 const providerId = process.env.PHENOML_FHIR_PROVIDER_ID;
 
-async function fetchPatientEncounters(patientFhirId: string) {
+/** Get the clinical DB patient ID from a UserPatient record based on the active backend.
+ *  Falls back to whichever ID is available when the preferred one is null
+ *  (e.g. records created under Medplum mode but now running in local mode). */
+function getClinicalPatientId(assignment: { patientFhirId: string; patientLocalId: string | null }): string {
+  const field = getPatientIdField();
+  const value = assignment[field];
+  if (value) return value;
+  // Fallback: use whichever ID is available
+  return assignment.patientLocalId || assignment.patientFhirId;
+}
+
+async function fetchPatientEncounters(patientId: string) {
+  if (isLocalBackend()) {
+    const encounters = await prismaClinical.encounter.findMany({
+      where: { patientId },
+      orderBy: { date: "desc" },
+    });
+    return encounters.map((e) => ({
+      fhirId: e.id,
+      encounterFhirId: e.id,
+      patientFhirId: e.patientId,
+      status: e.status,
+      classCode: e.classCode,
+      classDisplay: e.classDisplay,
+      date: e.date,
+      endDate: e.endDate || undefined,
+      noteText: e.noteText,
+      isSigned: e.isSigned,
+      signedAt: e.signedAt || undefined,
+      signedBy: e.signedBy || undefined,
+    }));
+  }
+
   if (!providerId) return [];
 
+  const { phenomlClient } = await import("@/lib/phenoml/client");
   const [encBundle, ciBundle] = await Promise.all([
     phenomlClient.fhir.search(providerId, "Encounter", {}, {
-      queryParams: { subject: `Patient/${patientFhirId}`, _count: "100" },
+      queryParams: { subject: `Patient/${patientId}`, _count: "100" },
     }),
     phenomlClient.fhir.search(providerId, "ClinicalImpression", {}, {
-      queryParams: { subject: `Patient/${patientFhirId}`, _count: "100" },
+      queryParams: { subject: `Patient/${patientId}`, _count: "100" },
     }),
   ]);
 
@@ -28,11 +63,30 @@ interface PatientInfo {
   sex: string;
 }
 
-async function fetchPatientInfo(patientFhirId: string): Promise<PatientInfo> {
+async function fetchPatientInfo(patientId: string): Promise<PatientInfo> {
+  if (isLocalBackend()) {
+    try {
+      const patient = await prismaClinical.patient.findUnique({
+        where: { id: patientId },
+      });
+      if (!patient) return { name: "Unknown", age: "", sex: "" };
+      let age = "";
+      if (patient.dob) {
+        const birthYear = new Date(patient.dob).getFullYear();
+        age = String(new Date().getFullYear() - birthYear);
+      }
+      const sex = patient.sex ? patient.sex.charAt(0).toUpperCase() : "";
+      return { name: patient.name || "Unknown", age, sex };
+    } catch {
+      return { name: "Unknown", age: "", sex: "" };
+    }
+  }
+
   if (!providerId) return { name: "Unknown", age: "", sex: "" };
   try {
+    const { phenomlClient } = await import("@/lib/phenoml/client");
     const result = await phenomlClient.fhir.search(providerId, "Patient", {}, {
-      queryParams: { _id: patientFhirId, _count: "1" },
+      queryParams: { _id: patientId, _count: "1" },
     });
     const bundle = result as any;
     const patient = bundle?.entry?.[0]?.resource;
@@ -74,7 +128,7 @@ export async function GET(request: NextRequest) {
   const userId = session.user.id;
   const isAdmin = session.user.role === UserRole.ADMIN;
 
-  if (!providerId) {
+  if (!isLocalBackend() && !providerId) {
     return NextResponse.json(
       { error: "FHIR provider not configured" },
       { status: 500 }
@@ -94,7 +148,7 @@ export async function GET(request: NextRequest) {
         where: { onboardingComplete: true },
         include: {
           _count: { select: { patients: true } },
-          patients: { select: { patientFhirId: true } },
+          patients: { select: { patientFhirId: true, patientLocalId: true } },
         },
         orderBy: { name: "asc" },
       });
@@ -106,7 +160,7 @@ export async function GET(request: NextRequest) {
           if (u.patients.length > 0) {
             const allEncounters = (
               await Promise.all(
-                u.patients.map((p) => fetchPatientEncounters(p.patientFhirId))
+                u.patients.map((p) => fetchPatientEncounters(getClinicalPatientId(p)))
               )
             ).flat();
             noteCount = allEncounters.filter((e) => e.isSigned).length;
@@ -144,9 +198,10 @@ export async function GET(request: NextRequest) {
 
       const results = await Promise.all(
         assignments.map(async (a) => {
+          const clinicalId = getClinicalPatientId(a);
           const [patientInfo, encounters] = await Promise.all([
-            fetchPatientInfo(a.patientFhirId),
-            fetchPatientEncounters(a.patientFhirId),
+            fetchPatientInfo(clinicalId),
+            fetchPatientEncounters(clinicalId),
           ]);
           const signedCount = encounters.filter((e) => e.isSigned).length;
           // Most recent encounter for note preview and CC
@@ -187,11 +242,15 @@ export async function GET(request: NextRequest) {
       });
 
       // Resolve patient names in parallel
-      const patientIds = [...new Set(assignments.map((a) => a.patientFhirId))];
+      const clinicalIdMap = new Map<string, string>();
+      for (const a of assignments) {
+        clinicalIdMap.set(a.patientFhirId, getClinicalPatientId(a));
+      }
+      const uniqueClinicalIds = [...new Set(clinicalIdMap.values())];
       const nameMap = new Map<string, string>();
       await Promise.all(
-        patientIds.map(async (pid) => {
-          nameMap.set(pid, await fetchPatientName(pid));
+        uniqueClinicalIds.map(async (cid) => {
+          nameMap.set(cid, await fetchPatientName(cid));
         })
       );
 
@@ -214,7 +273,7 @@ export async function GET(request: NextRequest) {
         assignments.map((a) => ({
           id: a.id,
           patientFhirId: a.patientFhirId,
-          patientName: nameMap.get(a.patientFhirId) || "Unknown",
+          patientName: nameMap.get(clinicalIdMap.get(a.patientFhirId) ?? "") || "Unknown",
           clinicianId: a.userId,
           clinicianName: a.user.name || a.user.email,
           status: a.status,
@@ -239,11 +298,13 @@ export async function GET(request: NextRequest) {
 
       // Access check: admin can view any, regular user must own the patient
       if (!isAdmin) {
-        const assignment = await prisma.userPatient.findUnique({
-          where: {
-            userId_patientFhirId: { userId, patientFhirId },
-          },
-        });
+        const assignment = isLocalBackend()
+          ? await prisma.userPatient.findUnique({
+              where: { userId_patientLocalId: { userId, patientLocalId: patientFhirId } },
+            })
+          : await prisma.userPatient.findUnique({
+              where: { userId_patientFhirId: { userId, patientFhirId } },
+            });
         if (!assignment) {
           return NextResponse.json({ error: "Forbidden" }, { status: 403 });
         }
@@ -272,17 +333,17 @@ export async function GET(request: NextRequest) {
       }
 
       const allAssignments = await prisma.userPatient.findMany({
-        select: { patientFhirId: true },
+        select: { patientFhirId: true, patientLocalId: true },
         orderBy: { assignedAt: "desc" },
         take: 100,
       });
-      const uniquePatientIds = [
-        ...new Set(allAssignments.map((a) => a.patientFhirId)),
+      const uniqueClinicalIds = [
+        ...new Set(allAssignments.map((a) => getClinicalPatientId(a))),
       ].slice(0, 50);
 
       const allEncounters = (
         await Promise.all(
-          uniquePatientIds.map((pid) => fetchPatientEncounters(pid))
+          uniqueClinicalIds.map((cid) => fetchPatientEncounters(cid))
         )
       ).flat();
 

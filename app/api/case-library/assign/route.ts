@@ -3,6 +3,7 @@ import { requireAuth, isSession } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { cloneEncounter } from "@/lib/services/fhir-clone-service";
 import { CaseStatus } from "@/lib/constants/case-status";
+import { isLocalBackend } from "@/lib/emr-backend";
 
 // POST /api/case-library/assign
 // Admin assigns a patient (optionally with encounter clone) to one or more clinicians
@@ -78,20 +79,33 @@ export async function POST(request: NextRequest) {
             includeNoteText,
           };
 
-          await prisma.userPatient.upsert({
-            where: {
-              userId_patientFhirId: {
-                userId: clinicianId,
-                patientFhirId: patientFhirId.trim(),
+          const pid = patientFhirId.trim();
+          if (isLocalBackend()) {
+            await prisma.userPatient.upsert({
+              where: {
+                userId_patientLocalId: { userId: clinicianId, patientLocalId: pid },
               },
-            },
-            update: data,
-            create: {
-              userId: clinicianId,
-              patientFhirId: patientFhirId.trim(),
-              ...data,
-            },
-          });
+              update: data,
+              create: {
+                userId: clinicianId,
+                patientFhirId: pid,
+                patientLocalId: pid,
+                ...data,
+              },
+            });
+          } else {
+            await prisma.userPatient.upsert({
+              where: {
+                userId_patientFhirId: { userId: clinicianId, patientFhirId: pid },
+              },
+              update: data,
+              create: {
+                userId: clinicianId,
+                patientFhirId: pid,
+                ...data,
+              },
+            });
+          }
 
           return {
             clinicianId,

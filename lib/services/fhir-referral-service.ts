@@ -4,6 +4,7 @@ import {
   mapFhirBundleToReferrals,
   mapAppReferralToFhirServiceRequest,
 } from "@/lib/phenoml/fhir-mapper";
+import { isLocalBackendClient } from "@/lib/emr-backend";
 
 // Abbreviation → full specialty name
 const REFERRAL_SPECIALTIES: Record<string, string> = {
@@ -90,6 +91,22 @@ export interface ReferralSearchResult {
 export async function searchFhirReferrals(
   patientFhirId: string
 ): Promise<ReferralSearchResult> {
+  if (isLocalBackendClient()) {
+    try {
+      const response = await fetch(
+        `/api/clinical/referral?patient=${encodeURIComponent(patientFhirId)}`
+      );
+      const data = await response.json();
+      if (!response.ok) {
+        return { referrals: [], total: 0, error: data.error || "Failed to fetch referrals" };
+      }
+      const referrals = (data.items || []).map((item: any) => ({ ...item, fhirId: item.id }));
+      return { referrals, total: data.total ?? referrals.length };
+    } catch (error) {
+      return { referrals: [], total: 0, error: error instanceof Error ? error.message : "Network error" };
+    }
+  }
+
   try {
     const response = await fetch(
       `/api/fhir/referral?patient=${encodeURIComponent(patientFhirId)}`
@@ -127,6 +144,10 @@ export interface ReferralParseResult {
 export async function parseReferralText(
   text: string
 ): Promise<ReferralParseResult> {
+  if (isLocalBackendClient()) {
+    return { resource: null };
+  }
+
   try {
     const response = await fetch("/api/fhir/lang2fhir", {
       method: "POST",
@@ -163,6 +184,23 @@ export interface ReferralCreateResult {
 export async function createFhirReferral(
   fhirResource: Record<string, unknown>
 ): Promise<ReferralCreateResult> {
+  if (isLocalBackendClient()) {
+    try {
+      const response = await fetch("/api/clinical/referral", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(fhirResource),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        return { success: false, error: data.error || "Failed to create referral" };
+      }
+      return { success: true, fhirId: data.id };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : "Network error" };
+    }
+  }
+
   try {
     const response = await fetch("/api/fhir/referral", {
       method: "POST",
@@ -198,8 +236,25 @@ export interface ReferralUpsertResult {
 export async function upsertFhirReferral(
   referral: AppReferral
 ): Promise<ReferralUpsertResult> {
+  if (isLocalBackendClient()) {
+    try {
+      const response = await fetch("/api/clinical/referral", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...referral, id: referral.fhirId }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        return { success: false, error: data.error || "Failed to save referral" };
+      }
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : "Network error" };
+    }
+  }
+
   if (!referral.fhirId) {
-    return { success: false, error: "Referral has no FHIR ID — cannot write back to Medplum" };
+    return { success: false, error: "Referral has no FHIR ID — cannot update without an ID" };
   }
 
   try {
@@ -219,7 +274,7 @@ export async function upsertFhirReferral(
     const data = await response.json();
 
     if (!response.ok) {
-      return { success: false, error: (data as any).error || "Failed to save referral to Medplum" };
+      return { success: false, error: (data as any).error || "Failed to save referral" };
     }
 
     return { success: true };
