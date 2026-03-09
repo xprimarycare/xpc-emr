@@ -17,10 +17,29 @@ export async function GET(request: NextRequest) {
     const forbidden = await requirePatientAccess(authResult, patientId)
     if (forbidden) return forbidden
 
-    const items = await prismaClinical.goal.findMany({
+    const rows = await prismaClinical.goal.findMany({
       where: { patientId },
       orderBy: { createdAt: "desc" },
     })
+
+    const items = rows.map((row) => ({
+      id: row.id,
+      fhirId: row.id,
+      name: row.name,
+      lifecycleStatus: row.lifecycleStatus,
+      expressedBy: row.expressedBy,
+      startDate: row.startDate,
+      note: row.note,
+      ...(row.codingCode
+        ? {
+            coding: {
+              system: row.codingSystem,
+              code: row.codingCode,
+              display: row.codingDisplay,
+            },
+          }
+        : {}),
+    }))
 
     return NextResponse.json({ items, total: items.length })
   } catch (error) {
@@ -36,11 +55,26 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json()
-    if (body.patientId) {
-      const forbidden = await requirePatientAccess(authResult, body.patientId)
-      if (forbidden) return forbidden
+    if (!body.patientId) {
+      return NextResponse.json({ error: "patientId is required" }, { status: 400 })
     }
-    const item = await prismaClinical.goal.create({ data: body })
+
+    const forbidden = await requirePatientAccess(authResult, body.patientId)
+    if (forbidden) return forbidden
+
+    const item = await prismaClinical.goal.create({
+      data: {
+        patientId: body.patientId,
+        name: body.name,
+        lifecycleStatus: body.lifecycleStatus || "proposed",
+        expressedBy: body.expressedBy || null,
+        startDate: body.startDate || null,
+        codingSystem: body.coding?.system || null,
+        codingCode: body.coding?.code || null,
+        codingDisplay: body.coding?.display || null,
+        note: body.note || null,
+      },
+    })
     return NextResponse.json({ id: item.id })
   } catch (error) {
     console.error("Clinical goal create error:", error)
@@ -55,10 +89,22 @@ export async function PUT(request: NextRequest) {
 
   try {
     const body = await request.json()
-    const { id, ...data } = body
+    const { id } = body
 
     if (!id) {
       return NextResponse.json({ error: "Goal ID is required" }, { status: 400 })
+    }
+
+    const data: Record<string, unknown> = {}
+    if (body.name !== undefined) data.name = body.name
+    if (body.lifecycleStatus !== undefined) data.lifecycleStatus = body.lifecycleStatus
+    if (body.expressedBy !== undefined) data.expressedBy = body.expressedBy || null
+    if (body.startDate !== undefined) data.startDate = body.startDate || null
+    if (body.note !== undefined) data.note = body.note || null
+    if (body.coding !== undefined) {
+      data.codingSystem = body.coding?.system || null
+      data.codingCode = body.coding?.code || null
+      data.codingDisplay = body.coding?.display || null
     }
 
     const item = await prismaClinical.goal.update({ where: { id }, data })
