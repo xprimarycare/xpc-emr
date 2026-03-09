@@ -4,6 +4,7 @@ import {
   mapFhirBundleToAllergies,
   mapAppAllergyToFhirAllergy,
 } from "@/lib/phenoml/fhir-mapper";
+import { isLocalBackendClient } from "@/lib/emr-backend";
 
 export interface ResolvedAllergyCode {
   code: string;
@@ -147,6 +148,28 @@ export async function searchAllergyCodes(
   text: string,
   isMed: boolean
 ): Promise<{ codes: ResolvedAllergyCode[]; error?: string }> {
+  if (isLocalBackendClient()) {
+    try {
+      const params = new URLSearchParams({ text, category: "allergy", limit: "5" });
+      const response = await fetch(`/api/clinical/catalog?${params}`);
+      const data = await response.json();
+      if (!response.ok) {
+        return { codes: [], error: data.error || "Failed to search allergy codes" };
+      }
+      const codes: ResolvedAllergyCode[] = (data.codes || []).map((c: any) => ({
+        code: c.code,
+        description: c.display,
+        system: c.system,
+      }));
+      return { codes };
+    } catch (error) {
+      return {
+        codes: [],
+        error: error instanceof Error ? error.message : "Network error",
+      };
+    }
+  }
+
   try {
     const codesystem = isMed ? "RXNORM" : "SNOMEDCT";
     const params = new URLSearchParams({
@@ -244,11 +267,34 @@ export interface AllergySearchResult {
 }
 
 /**
- * Fetch a patient's allergies from Medplum via PhenoML
+ * Fetch a patient's allergies from EMR
  */
 export async function searchFhirAllergies(
   patientFhirId: string
 ): Promise<AllergySearchResult> {
+  if (isLocalBackendClient()) {
+    try {
+      const response = await fetch(
+        `/api/clinical/allergy?patient=${encodeURIComponent(patientFhirId)}`
+      );
+      const data = await response.json();
+      if (!response.ok) {
+        return { allergies: [], total: 0, error: data.error || "Failed to fetch allergies" };
+      }
+      const allergies: AppAllergy[] = (data.items || []).map((item: any) => ({
+        ...item,
+        fhirId: item.id,
+      }));
+      return { allergies, total: data.total ?? allergies.length };
+    } catch (error) {
+      return {
+        allergies: [],
+        total: 0,
+        error: error instanceof Error ? error.message : "Network error",
+      };
+    }
+  }
+
   try {
     const response = await fetch(
       `/api/fhir/allergy?patient=${encodeURIComponent(patientFhirId)}`
@@ -295,16 +341,36 @@ export interface AllergyUpsertResult {
 }
 
 /**
- * Write an allergy back to Medplum via PUT upsert.
+ * Write an allergy back via PUT upsert.
  */
 export async function upsertFhirAllergy(
   allergy: AppAllergy,
   patientFhirId: string
 ): Promise<AllergyUpsertResult> {
+  if (isLocalBackendClient()) {
+    try {
+      const response = await fetch("/api/clinical/allergy", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...allergy, id: allergy.fhirId, patientId: patientFhirId }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        return { success: false, error: data.error || "Failed to save allergy" };
+      }
+      return { success: true };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : "Network error",
+      };
+    }
+  }
+
   if (!allergy.fhirId) {
     return {
       success: false,
-      error: "Allergy has no FHIR ID - cannot write back to Medplum",
+      error: "Allergy has no FHIR ID - cannot update without an ID",
     };
   }
 
@@ -327,7 +393,7 @@ export async function upsertFhirAllergy(
     if (!response.ok) {
       return {
         success: false,
-        error: data.error || "Failed to save allergy to Medplum",
+        error: data.error || "Failed to save allergy",
       };
     }
 
@@ -346,11 +412,30 @@ export interface AllergyDeleteResult {
 }
 
 /**
- * Delete an allergy from Medplum via DELETE.
+ * Delete an allergy from EMR via DELETE.
  */
 export async function deleteFhirAllergy(
   allergyFhirId: string
 ): Promise<AllergyDeleteResult> {
+  if (isLocalBackendClient()) {
+    try {
+      const response = await fetch(
+        `/api/clinical/allergy?id=${encodeURIComponent(allergyFhirId)}`,
+        { method: "DELETE" }
+      );
+      const data = await response.json();
+      if (!response.ok) {
+        return { success: false, error: data.error || "Failed to delete allergy" };
+      }
+      return { success: true };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : "Network error",
+      };
+    }
+  }
+
   try {
     const response = await fetch(
       `/api/fhir/allergy?id=${encodeURIComponent(allergyFhirId)}`,
@@ -367,7 +452,7 @@ export async function deleteFhirAllergy(
     if (!response.ok) {
       return {
         success: false,
-        error: data.error || "Failed to delete allergy from Medplum",
+        error: data.error || "Failed to delete allergy",
       };
     }
 
@@ -387,15 +472,35 @@ export interface AllergyCreateResult {
 }
 
 /**
- * Create a new allergy in Medplum via POST.
+ * Create a new allergy via POST.
  */
 export async function createFhirAllergy(
   allergy: AppAllergy,
   patientFhirId: string
 ): Promise<AllergyCreateResult> {
+  if (isLocalBackendClient()) {
+    try {
+      const response = await fetch("/api/clinical/allergy", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...allergy, patientId: patientFhirId }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        return { success: false, error: data.error || "Failed to create allergy" };
+      }
+      return { success: true, allergyFhirId: data.id };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : "Network error",
+      };
+    }
+  }
+
   try {
     const fhirResource = mapAppAllergyToFhirAllergy(allergy, patientFhirId);
-    // Remove id for creation (let Medplum assign it)
+    // Remove id for creation (let the backend assign it)
     delete (fhirResource as any).id;
 
     const response = await fetch("/api/fhir/allergy", {
@@ -414,7 +519,7 @@ export async function createFhirAllergy(
     if (!response.ok) {
       return {
         success: false,
-        error: data.error || "Failed to create allergy in Medplum",
+        error: data.error || "Failed to create allergy",
       };
     }
 

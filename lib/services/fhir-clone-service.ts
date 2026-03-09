@@ -1,8 +1,11 @@
 import { faker } from "@faker-js/faker";
-import { phenomlClient } from "@/lib/phenoml/client";
+import { getPhenomlClient } from "@/lib/phenoml/client";
 import { CLONEABLE_RESOURCE_TYPES } from "@/lib/data/cloneable-resource-types";
+import { isLocalBackendClient } from "@/lib/emr-backend";
 
-const providerId = process.env.PHENOML_FHIR_PROVIDER_ID;
+function getProviderId() {
+  return process.env.PHENOML_FHIR_PROVIDER_ID;
+}
 
 const MS_PER_YEAR = 365.25 * 24 * 60 * 60 * 1000;
 
@@ -74,11 +77,17 @@ function prepareEncounterClone(sourceEnc: any, targetPatientFhirId: string): any
 export async function cloneEncounter(
   options: CloneEncounterOptions
 ): Promise<CloneEncounterResult> {
+  if (isLocalBackendClient()) {
+    return { error: "Single encounter cloning not supported in local mode yet" };
+  }
+
+  const providerId = getProviderId();
   if (!providerId) return { error: "FHIR provider not configured" };
+  const client = getPhenomlClient();
 
   try {
     // Fetch source encounter
-    const encBundle = await phenomlClient.fhir.search(providerId, "Encounter", {}, {
+    const encBundle = await client.fhir.search(providerId, "Encounter", {}, {
       queryParams: { _id: options.sourceEncounterFhirId, _count: "1" },
     });
     const sourceEnc = (encBundle as any)?.entry?.[0]?.resource;
@@ -87,14 +96,14 @@ export async function cloneEncounter(
     // Clone encounter: strip ID, remove signing ext, update patient ref, set status
     const clonedEnc = prepareEncounterClone(sourceEnc, options.targetPatientFhirId);
 
-    const newEnc = (await phenomlClient.fhir.create(providerId, "Encounter", {
+    const newEnc = (await client.fhir.create(providerId, "Encounter", {
       body: clonedEnc,
     })) as any;
     const encounterFhirId = newEnc?.id;
     if (!encounterFhirId) return { error: "Failed to create cloned encounter" };
 
     // Fetch ClinicalImpressions for this specific encounter
-    const ciBundle = await phenomlClient.fhir.search(
+    const ciBundle = await client.fhir.search(
       providerId,
       "ClinicalImpression",
       {},
@@ -124,7 +133,7 @@ export async function cloneEncounter(
         clonedCI.note = clonedCI.note.map((n: any) => ({ ...n, text: "" }));
       }
 
-      const newCI = (await phenomlClient.fhir.create(
+      const newCI = (await client.fhir.create(
         providerId,
         "ClinicalImpression",
         { body: clonedCI }
@@ -163,14 +172,47 @@ export interface ClonePatientResult {
 export async function clonePatient(
   options: ClonePatientOptions
 ): Promise<ClonePatientResult> {
+  if (isLocalBackendClient()) {
+    try {
+      const res = await fetch("/api/clinical/clone", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sourcePatientId: options.sourcePatientFhirId,
+          newName: options.overrideName
+            ? options.overrideName.given[0] + " " + options.overrideName.family
+            : undefined,
+          newDob: options.overrideBirthDate,
+          newSex: options.overrideGender,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        return { clonedCounts: {}, errors: [data.error || "Failed to clone patient"] };
+      }
+      return {
+        newPatientFhirId: data.id,
+        clonedCounts: data.clonedCounts || {},
+        errors: [],
+      };
+    } catch (error) {
+      return {
+        clonedCounts: {},
+        errors: [error instanceof Error ? error.message : "Network error"],
+      };
+    }
+  }
+
   const clonedCounts: Record<string, number> = {};
   const errors: string[] = [];
 
+  const providerId = getProviderId();
   if (!providerId) return { errors: ["FHIR provider not configured"], clonedCounts };
+  const client = getPhenomlClient();
 
   try {
     // Fetch source patient
-    const patBundle = await phenomlClient.fhir.search(providerId, "Patient", {}, {
+    const patBundle = await client.fhir.search(providerId, "Patient", {}, {
       queryParams: { _id: options.sourcePatientFhirId, _count: "1" },
     });
     const sourcePatient = (patBundle as any)?.entry?.[0]?.resource;
@@ -192,7 +234,7 @@ export async function clonePatient(
       clonedPatient.gender = options.overrideGender;
     }
 
-    const newPatient = (await phenomlClient.fhir.create(providerId, "Patient", {
+    const newPatient = (await client.fhir.create(providerId, "Patient", {
       body: clonedPatient,
     })) as any;
     const newPatientFhirId = newPatient?.id;
@@ -220,7 +262,7 @@ export async function clonePatient(
             ...mapping.extraParams,
           };
 
-          const bundle = await phenomlClient.fhir.search(
+          const bundle = await client.fhir.search(
             providerId!,
             mapping.resourceType,
             {},
@@ -243,7 +285,7 @@ export async function clonePatient(
                 cloned.patient.reference = `Patient/${newPatientFhirId}`;
               }
 
-              return phenomlClient.fhir.create(providerId!, mapping.resourceType, {
+              return client.fhir.create(providerId!, mapping.resourceType, {
                 body: cloned,
               });
             })
@@ -261,7 +303,7 @@ export async function clonePatient(
     // Clone encounters (+ their ClinicalImpressions) if selected
     if (includeEncounters) {
       try {
-        const encBundle = await phenomlClient.fhir.search(providerId!, "Encounter", {}, {
+        const encBundle = await client.fhir.search(providerId!, "Encounter", {}, {
           queryParams: {
             subject: `Patient/${options.sourcePatientFhirId}`,
             _count: "200",
@@ -274,13 +316,13 @@ export async function clonePatient(
         const results = await Promise.all(
           encounters.map(async (sourceEnc: any) => {
             const clonedEnc = prepareEncounterClone(sourceEnc, newPatientFhirId);
-            const newEnc = (await phenomlClient.fhir.create(providerId!, "Encounter", {
+            const newEnc = (await client.fhir.create(providerId!, "Encounter", {
               body: clonedEnc,
             })) as any;
             if (!newEnc?.id) return false;
 
             // Clone ClinicalImpressions for this encounter
-            const ciBundle = await phenomlClient.fhir.search(
+            const ciBundle = await client.fhir.search(
               providerId!,
               "ClinicalImpression",
               {},
@@ -304,7 +346,7 @@ export async function clonePatient(
                 clonedCI.status = "in-progress";
                 clonedCI.subject = { reference: `Patient/${newPatientFhirId}` };
                 clonedCI.encounter = { reference: `Encounter/${newEnc.id}` };
-                await phenomlClient.fhir.create(providerId!, "ClinicalImpression", {
+                await client.fhir.create(providerId!, "ClinicalImpression", {
                   body: clonedCI,
                 });
               })

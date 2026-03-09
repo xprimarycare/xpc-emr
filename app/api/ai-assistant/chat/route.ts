@@ -39,6 +39,8 @@ import type { AppGoal } from "@/lib/types/goal";
 import type { AppReferral } from "@/lib/types/referral";
 import type { AIAssistantMessage } from "@/lib/types/ai-assistant";
 import { requireAuth, isSession } from "@/lib/auth-helpers";
+import { isLocalBackend } from "@/lib/emr-backend";
+import { prismaClinical } from "@/lib/prisma-clinical";
 
 // --- In-Memory Patient Context Cache ---
 
@@ -184,6 +186,167 @@ async function fetchPatientContext(
   };
 }
 
+// --- Local DB Data Aggregation ---
+
+async function fetchLocalPatientContext(
+  patientId: string
+): Promise<CachedPatientContext> {
+  const errors: string[] = [];
+
+  try {
+    const patient = await prismaClinical.patient.findUnique({
+      where: { id: patientId },
+      include: {
+        medications: true,
+        allergies: true,
+        conditions: true,
+        procedures: true,
+        familyHistories: { include: { conditions: true } },
+        vitals: { orderBy: { effectiveDateTime: "desc" } },
+        socialHistories: true,
+        encounters: true,
+        labOrders: true,
+        imagingOrders: true,
+        referrals: true,
+        goals: true,
+        careTeamMembers: true,
+        tasks: true,
+        appointments: true,
+        threads: { include: { messages: true } },
+      },
+    });
+
+    if (!patient) {
+      return {
+        patient: null,
+        medications: [],
+        allergies: [],
+        conditions: [],
+        procedures: [],
+        familyHistory: [],
+        socialHistory: [],
+        encounters: [],
+        labOrders: [],
+        imagingOrders: [],
+        tasks: [],
+        appointments: [],
+        vitals: [],
+        messages: [],
+        careTeam: [],
+        goals: [],
+        referrals: [],
+        fetchedAt: Date.now(),
+        errors: ["Patient not found"],
+      };
+    }
+
+    // Map to app types (clinical DB fields closely match app types)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const mapId = (item: any) => ({ ...item, fhirId: item.id });
+
+    return {
+      patient: {
+        fhirId: patient.id,
+        name: patient.name,
+        dob: patient.dob,
+        sex: patient.sex,
+        mrn: patient.mrn,
+        avatar: patient.avatar || undefined,
+        summary: patient.summary || undefined,
+      } as PatientData,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      medications: patient.medications.map(mapId) as any[],
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      allergies: patient.allergies.map(mapId) as any[],
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      conditions: patient.conditions.map((c) => ({
+        ...c,
+        fhirId: c.id,
+        coding: c.codingCode ? { code: c.codingCode, system: c.codingSystem || "", display: c.codingDisplay || "" } : undefined,
+      })) as any[],
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      procedures: patient.procedures.map(mapId) as any[],
+      familyHistory: patient.familyHistories.map((fh) => ({
+        ...fh,
+        fhirId: fh.id,
+        conditions: fh.conditions.map((c) => ({ ...c, fhirId: c.id })),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      })) as any[],
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      socialHistory: patient.socialHistories.map(mapId) as any[],
+      encounters: patient.encounters.map((e) => ({
+        ...e,
+        fhirId: e.id,
+        encounterFhirId: e.id,
+        patientFhirId: e.patientId,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      })) as any[],
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      labOrders: patient.labOrders.map(mapId) as any[],
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      imagingOrders: patient.imagingOrders.map(mapId) as any[],
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      tasks: patient.tasks.map((t) => ({ ...t, fhirId: t.id, patientFhirId: patient.id })) as any[],
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      appointments: patient.appointments.map(mapId) as any[],
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      vitals: patient.vitals.map((v) => ({ ...v, fhirId: v.id, patientFhirId: patient.id })) as any[],
+      messages: patient.threads.map((t) => ({
+        id: t.id,
+        fhirId: t.id,
+        topic: t.topic || "",
+        patientRef: `Patient/${patient.id}`,
+        messages: t.messages.map((m) => ({
+          id: m.id,
+          fhirId: m.id,
+          threadId: t.id,
+          text: m.text,
+          senderType: m.senderType,
+          senderRef: m.senderRef || "",
+          sentAt: m.sentAt || "",
+          status: "completed" as const,
+        })),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      })) as any[],
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      careTeam: patient.careTeamMembers.map(mapId) as any[],
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      goals: patient.goals.map((g: any) => ({
+        ...g,
+        fhirId: g.id,
+        coding: g.codingCode ? { code: g.codingCode, system: g.codingSystem || "", display: g.codingDisplay || "" } : undefined,
+      })) as any[],
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      referrals: patient.referrals.map((r) => ({ ...r, fhirId: r.id, patientFhirId: patient.id })) as any[],
+      fetchedAt: Date.now(),
+      errors,
+    };
+  } catch (error) {
+    errors.push(error instanceof Error ? error.message : "Failed to fetch patient context");
+    return {
+      patient: null,
+      medications: [],
+      allergies: [],
+      conditions: [],
+      procedures: [],
+      familyHistory: [],
+      socialHistory: [],
+      encounters: [],
+      labOrders: [],
+      imagingOrders: [],
+      tasks: [],
+      appointments: [],
+      vitals: [],
+      messages: [],
+      careTeam: [],
+      goals: [],
+      referrals: [],
+      fetchedAt: Date.now(),
+      errors,
+    };
+  }
+}
+
 // --- Cache Helper ---
 
 async function getPatientContext(
@@ -204,7 +367,9 @@ async function getPatientContext(
 
   log("log", "Fetching fresh patient context", { patientFhirId });
   const startTime = Date.now();
-  const context = await fetchPatientContext(patientFhirId, providerId);
+  const context = isLocalBackend()
+    ? await fetchLocalPatientContext(patientFhirId)
+    : await fetchPatientContext(patientFhirId, providerId);
   const elapsed = Date.now() - startTime;
 
   log("log", `Patient context fetched in ${elapsed}ms`, {
@@ -482,7 +647,7 @@ export async function POST(request: NextRequest) {
     }
 
     const providerId = process.env.PHENOML_FHIR_PROVIDER_ID;
-    if (!providerId) {
+    if (!isLocalBackend() && !providerId) {
       log("warn", "FHIR provider not configured");
       return NextResponse.json(
         { error: "FHIR provider not configured" },
@@ -511,7 +676,7 @@ export async function POST(request: NextRequest) {
     });
 
     // 1. Get patient context (cached or fresh)
-    const patientContext = await getPatientContext(patientFhirId, providerId, authResult.user.id, log);
+    const patientContext = await getPatientContext(patientFhirId, providerId || "", authResult.user.id, log);
 
     // 2. Build system prompt
     const systemPrompt = buildSystemPrompt(patientContext);

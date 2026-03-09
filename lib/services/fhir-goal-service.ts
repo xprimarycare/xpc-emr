@@ -4,6 +4,7 @@ import {
   mapFhirBundleToGoals,
   mapAppGoalToFhirGoal,
 } from "@/lib/phenoml/fhir-mapper";
+import { isLocalBackendClient } from "@/lib/emr-backend";
 
 export interface ResolvedGoalCode {
   code: string;
@@ -49,6 +50,24 @@ export interface GoalCodeSearchResult {
 export async function searchGoalCodes(
   text: string
 ): Promise<GoalCodeSearchResult> {
+  if (isLocalBackendClient()) {
+    try {
+      const params = new URLSearchParams({ text, category: "goal", limit: "5" });
+      const response = await fetch(`/api/clinical/catalog?${params}`);
+      const data = await response.json();
+      if (!response.ok) {
+        return { codes: [], error: data.error || "Failed to search goal codes" };
+      }
+      const codes: ResolvedGoalCode[] = (data.codes || []).map((c: any) => ({
+        code: c.code,
+        description: c.display,
+      }));
+      return { codes };
+    } catch (error) {
+      return { codes: [], error: error instanceof Error ? error.message : "Network error" };
+    }
+  }
+
   try {
     const params = new URLSearchParams({
       codesystem: "SNOMEDCT",
@@ -133,6 +152,22 @@ export interface GoalSearchResult {
 export async function searchFhirGoals(
   patientFhirId: string
 ): Promise<GoalSearchResult> {
+  if (isLocalBackendClient()) {
+    try {
+      const response = await fetch(
+        `/api/clinical/goal?patient=${encodeURIComponent(patientFhirId)}`
+      );
+      const data = await response.json();
+      if (!response.ok) {
+        return { goals: [], total: 0, error: data.error || "Failed to fetch goals" };
+      }
+      const goals = (data.items || []).map((item: any) => ({ ...item, fhirId: item.id }));
+      return { goals, total: data.total ?? goals.length };
+    } catch (error) {
+      return { goals: [], total: 0, error: error instanceof Error ? error.message : "Network error" };
+    }
+  }
+
   try {
     const response = await fetch(
       `/api/fhir/goal?patient=${encodeURIComponent(patientFhirId)}`
@@ -182,10 +217,27 @@ export async function upsertFhirGoal(
   goal: AppGoal,
   patientFhirId: string
 ): Promise<GoalUpsertResult> {
+  if (isLocalBackendClient()) {
+    try {
+      const response = await fetch("/api/clinical/goal", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...goal, id: goal.fhirId, patientId: patientFhirId }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        return { success: false, error: data.error || "Failed to save goal" };
+      }
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : "Network error" };
+    }
+  }
+
   if (!goal.fhirId) {
     return {
       success: false,
-      error: "Goal has no FHIR ID - cannot write back to Medplum",
+      error: "Goal has no FHIR ID - cannot update without an ID",
     };
   }
 
@@ -208,7 +260,7 @@ export async function upsertFhirGoal(
     if (!response.ok) {
       return {
         success: false,
-        error: data.error || "Failed to save goal to Medplum",
+        error: data.error || "Failed to save goal",
       };
     }
 
@@ -229,6 +281,22 @@ export interface GoalDeleteResult {
 export async function deleteFhirGoal(
   goalFhirId: string
 ): Promise<GoalDeleteResult> {
+  if (isLocalBackendClient()) {
+    try {
+      const response = await fetch(
+        `/api/clinical/goal?id=${encodeURIComponent(goalFhirId)}`,
+        { method: "DELETE" }
+      );
+      const data = await response.json();
+      if (!response.ok) {
+        return { success: false, error: data.error || "Failed to delete goal" };
+      }
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : "Network error" };
+    }
+  }
+
   try {
     const response = await fetch(
       `/api/fhir/goal?id=${encodeURIComponent(goalFhirId)}`,
@@ -245,7 +313,7 @@ export async function deleteFhirGoal(
     if (!response.ok) {
       return {
         success: false,
-        error: data.error || "Failed to delete goal from Medplum",
+        error: data.error || "Failed to delete goal",
       };
     }
 
@@ -268,6 +336,23 @@ export async function createFhirGoal(
   goal: AppGoal,
   patientFhirId: string
 ): Promise<GoalCreateResult> {
+  if (isLocalBackendClient()) {
+    try {
+      const response = await fetch("/api/clinical/goal", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...goal, patientId: patientFhirId }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        return { success: false, error: data.error || "Failed to create goal" };
+      }
+      return { success: true, goalFhirId: data.id };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : "Network error" };
+    }
+  }
+
   try {
     const fhirResource = mapAppGoalToFhirGoal(goal, patientFhirId);
     delete (fhirResource as any).id;
@@ -288,7 +373,7 @@ export async function createFhirGoal(
     if (!response.ok) {
       return {
         success: false,
-        error: data.error || "Failed to create goal in Medplum",
+        error: data.error || "Failed to create goal",
       };
     }
 

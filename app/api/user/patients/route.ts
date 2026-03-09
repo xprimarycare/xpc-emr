@@ -2,6 +2,8 @@ import { auth } from "@/auth"
 import { prisma } from "@/lib/prisma"
 import { NextRequest, NextResponse } from "next/server"
 import { CaseStatus, VALID_STATUS_TRANSITIONS } from "@/lib/constants/case-status"
+import { isLocalBackend } from "@/lib/emr-backend"
+import { getPatientIdField } from "@/lib/patient-id"
 
 // GET: List current user's assigned patient FHIR IDs
 export async function GET() {
@@ -18,6 +20,7 @@ export async function GET() {
       where: { userId: session.user.id },
       select: {
         patientFhirId: true,
+        patientLocalId: true,
         assignedAt: true,
         status: true,
         assignedBy: true,
@@ -29,8 +32,9 @@ export async function GET() {
       orderBy: { assignedAt: "desc" },
     })
 
+    const idField = getPatientIdField()
     return NextResponse.json({
-      patientFhirIds: assignments.map((a) => a.patientFhirId),
+      patientFhirIds: assignments.map((a) => a[idField] ?? a.patientFhirId),
       assignments,
     })
   } catch (error) {
@@ -82,19 +86,22 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const assignment = await prisma.userPatient.upsert({
-      where: {
-        userId_patientFhirId: {
-          userId: targetUserId,
-          patientFhirId: patientFhirId.trim(),
-        },
-      },
-      update: {},
-      create: {
-        userId: targetUserId,
-        patientFhirId: patientFhirId.trim(),
-      },
-    })
+    const pid = patientFhirId.trim()
+    const assignment = isLocalBackend()
+      ? await prisma.userPatient.upsert({
+          where: {
+            userId_patientLocalId: { userId: targetUserId, patientLocalId: pid },
+          },
+          update: {},
+          create: { userId: targetUserId, patientFhirId: pid, patientLocalId: pid },
+        })
+      : await prisma.userPatient.upsert({
+          where: {
+            userId_patientFhirId: { userId: targetUserId, patientFhirId: pid },
+          },
+          update: {},
+          create: { userId: targetUserId, patientFhirId: pid },
+        })
 
     return NextResponse.json({ success: true, assignment })
   } catch (error) {
@@ -146,10 +153,11 @@ export async function PATCH(request: NextRequest) {
     }
 
     // Atomic conditional update — avoids TOCTOU race
+    const idField = getPatientIdField()
     const result = await prisma.userPatient.updateMany({
       where: {
         userId: session.user.id,
-        patientFhirId: patientFhirId.trim(),
+        [idField]: patientFhirId.trim(),
         status: requiredCurrentStatus,
       },
       data: { status },
@@ -192,10 +200,11 @@ export async function DELETE(request: NextRequest) {
       )
     }
 
+    const idField = getPatientIdField()
     await prisma.userPatient.deleteMany({
       where: {
         userId: session.user.id,
-        patientFhirId: patientFhirId.trim(),
+        [idField]: patientFhirId.trim(),
       },
     })
 

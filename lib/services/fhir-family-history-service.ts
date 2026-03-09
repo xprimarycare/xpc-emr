@@ -4,6 +4,7 @@ import {
   mapFhirBundleToFamilyHistories,
   mapAppFamilyHistoryToFhirFamilyHistory,
 } from "@/lib/phenoml/fhir-mapper";
+import { isLocalBackendClient } from "@/lib/emr-backend";
 
 // Common family history condition abbreviations
 const FAMILY_HISTORY_ABBREVIATIONS: Record<string, string> = {
@@ -196,6 +197,23 @@ export function parseFamilyHistoryText(text: string): ResolvedFamilyEntry[] {
 async function searchConditionCodes(
   text: string
 ): Promise<{ codes: ResolvedFamilyCode[]; error?: string }> {
+  if (isLocalBackendClient()) {
+    try {
+      const params = new URLSearchParams({ text, category: "condition", limit: "5" });
+      const response = await fetch(`/api/clinical/catalog?${params}`);
+      const data = await response.json();
+      if (!response.ok) {
+        return { codes: [], error: data.error || "Failed to search condition codes" };
+      }
+      const codes: ResolvedFamilyCode[] = (data.codes || []).map(
+        (c: any) => ({ code: c.code, description: c.display })
+      );
+      return { codes };
+    } catch (error) {
+      return { codes: [], error: error instanceof Error ? error.message : "Network error" };
+    }
+  }
+
   try {
     const params = new URLSearchParams({
       codesystem: "SNOMEDCT",
@@ -273,6 +291,28 @@ export interface FamilyHistorySearchResult {
 export async function searchFhirFamilyHistories(
   patientFhirId: string
 ): Promise<FamilyHistorySearchResult> {
+  if (isLocalBackendClient()) {
+    try {
+      const response = await fetch(
+        `/api/clinical/family-history?patient=${encodeURIComponent(patientFhirId)}`
+      );
+      const data = await response.json();
+      if (!response.ok) {
+        return { members: [], total: 0, error: data.error || "Failed to fetch family history" };
+      }
+      const members: AppFamilyMemberHistory[] = (data.items || []).map(
+        (item: any) => ({
+          ...item,
+          fhirId: item.id,
+          conditions: (item.conditions || []).map((c: any) => ({ ...c, fhirId: c.id })),
+        })
+      );
+      return { members, total: data.total ?? members.length };
+    } catch (error) {
+      return { members: [], total: 0, error: error instanceof Error ? error.message : "Network error" };
+    }
+  }
+
   try {
     const response = await fetch(
       `/api/fhir/family-history?patient=${encodeURIComponent(patientFhirId)}`
@@ -311,8 +351,25 @@ export async function upsertFhirFamilyHistory(
   member: AppFamilyMemberHistory,
   patientFhirId: string
 ): Promise<FamilyHistoryUpsertResult> {
+  if (isLocalBackendClient()) {
+    try {
+      const response = await fetch("/api/clinical/family-history", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...member, id: member.fhirId, patientId: patientFhirId }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        return { success: false, error: data.error || "Failed to save family history" };
+      }
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : "Network error" };
+    }
+  }
+
   if (!member.fhirId) {
-    return { success: false, error: "Family member has no FHIR ID - cannot write back to Medplum" };
+    return { success: false, error: "Family member has no FHIR ID - cannot update without an ID" };
   }
 
   try {
@@ -332,7 +389,7 @@ export async function upsertFhirFamilyHistory(
     const data = await response.json();
 
     if (!response.ok) {
-      return { success: false, error: data.error || "Failed to save family history to Medplum" };
+      return { success: false, error: data.error || "Failed to save family history" };
     }
 
     return { success: true };
@@ -352,6 +409,22 @@ export interface FamilyHistoryDeleteResult {
 export async function deleteFhirFamilyHistory(
   fhirId: string
 ): Promise<FamilyHistoryDeleteResult> {
+  if (isLocalBackendClient()) {
+    try {
+      const response = await fetch(
+        `/api/clinical/family-history?id=${encodeURIComponent(fhirId)}`,
+        { method: "DELETE" }
+      );
+      const data = await response.json();
+      if (!response.ok) {
+        return { success: false, error: data.error || "Failed to delete family history" };
+      }
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : "Network error" };
+    }
+  }
+
   try {
     const response = await fetch(
       `/api/fhir/family-history?id=${encodeURIComponent(fhirId)}`,
@@ -366,7 +439,7 @@ export async function deleteFhirFamilyHistory(
     const data = await response.json();
 
     if (!response.ok) {
-      return { success: false, error: data.error || "Failed to delete family history from Medplum" };
+      return { success: false, error: data.error || "Failed to delete family history" };
     }
 
     return { success: true };
@@ -388,6 +461,23 @@ export async function createFhirFamilyHistory(
   member: AppFamilyMemberHistory,
   patientFhirId: string
 ): Promise<FamilyHistoryCreateResult> {
+  if (isLocalBackendClient()) {
+    try {
+      const response = await fetch("/api/clinical/family-history", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...member, patientId: patientFhirId }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        return { success: false, error: data.error || "Failed to create family history" };
+      }
+      return { success: true, fhirId: data.id };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : "Network error" };
+    }
+  }
+
   try {
     const fhirResource = mapAppFamilyHistoryToFhirFamilyHistory(member, patientFhirId);
     delete (fhirResource as any).id;
@@ -406,7 +496,7 @@ export async function createFhirFamilyHistory(
     const data = await response.json();
 
     if (!response.ok) {
-      return { success: false, error: data.error || "Failed to create family history in Medplum" };
+      return { success: false, error: data.error || "Failed to create family history" };
     }
 
     return { success: true, fhirId: data.id };

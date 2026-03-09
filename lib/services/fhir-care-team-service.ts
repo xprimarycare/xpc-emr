@@ -4,6 +4,7 @@ import {
   mapFhirBundleToCareTeamMembers,
   mapAppCareTeamMemberToFhirCareTeam,
 } from "@/lib/phenoml/fhir-mapper";
+import { isLocalBackendClient } from "@/lib/emr-backend";
 
 export interface ResolvedSpecialtyCode {
   code: string;
@@ -116,6 +117,25 @@ export function parseCareTeamText(text: string): ParsedCareTeamEntry[] {
 export async function searchSpecialtyCodes(
   text: string
 ): Promise<{ codes: ResolvedSpecialtyCode[]; error?: string }> {
+  if (isLocalBackendClient()) {
+    try {
+      const params = new URLSearchParams({ text, category: "specialty", limit: "5" });
+      const response = await fetch(`/api/clinical/catalog?${params}`);
+      const data = await response.json();
+      if (!response.ok) {
+        return { codes: [], error: data.error || "Failed to search specialty codes" };
+      }
+      const codes: ResolvedSpecialtyCode[] = (data.codes || []).map((c: any) => ({
+        code: c.code,
+        description: c.display,
+        system: c.system,
+      }));
+      return { codes };
+    } catch (error) {
+      return { codes: [], error: error instanceof Error ? error.message : "Network error" };
+    }
+  }
+
   try {
     const params = new URLSearchParams({
       codesystem: 'SNOMEDCT',
@@ -211,6 +231,22 @@ export interface CareTeamSearchResult {
 export async function searchFhirCareTeamMembers(
   patientFhirId: string
 ): Promise<CareTeamSearchResult> {
+  if (isLocalBackendClient()) {
+    try {
+      const response = await fetch(
+        `/api/clinical/care-team?patient=${encodeURIComponent(patientFhirId)}`
+      );
+      const data = await response.json();
+      if (!response.ok) {
+        return { members: [], total: 0, error: data.error || "Failed to fetch care team" };
+      }
+      const members = (data.items || []).map((item: any) => ({ ...item, fhirId: item.id }));
+      return { members, total: data.total ?? members.length };
+    } catch (error) {
+      return { members: [], total: 0, error: error instanceof Error ? error.message : "Network error" };
+    }
+  }
+
   try {
     const response = await fetch(
       `/api/fhir/care-team?patient=${encodeURIComponent(patientFhirId)}`
@@ -249,6 +285,23 @@ export async function upsertFhirCareTeamMember(
   member: AppCareTeamMember,
   patientFhirId: string
 ): Promise<CareTeamUpsertResult> {
+  if (isLocalBackendClient()) {
+    try {
+      const response = await fetch("/api/clinical/care-team", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...member, id: member.fhirId, patientId: patientFhirId }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        return { success: false, error: data.error || "Failed to save care team member" };
+      }
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : "Network error" };
+    }
+  }
+
   if (!member.fhirId) {
     return { success: false, error: 'Care team member has no FHIR ID - cannot write back' };
   }
@@ -286,6 +339,22 @@ export interface CareTeamDeleteResult {
 export async function deleteFhirCareTeamMember(
   fhirId: string
 ): Promise<CareTeamDeleteResult> {
+  if (isLocalBackendClient()) {
+    try {
+      const response = await fetch(
+        `/api/clinical/care-team?id=${encodeURIComponent(fhirId)}`,
+        { method: "DELETE" }
+      );
+      const data = await response.json();
+      if (!response.ok) {
+        return { success: false, error: data.error || "Failed to delete care team member" };
+      }
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : "Network error" };
+    }
+  }
+
   try {
     const response = await fetch(
       `/api/fhir/care-team?id=${encodeURIComponent(fhirId)}`,
@@ -318,6 +387,23 @@ export async function createFhirCareTeamMember(
   member: AppCareTeamMember,
   patientFhirId: string
 ): Promise<CareTeamCreateResult> {
+  if (isLocalBackendClient()) {
+    try {
+      const response = await fetch("/api/clinical/care-team", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...member, patientId: patientFhirId }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        return { success: false, error: data.error || "Failed to create care team member" };
+      }
+      return { success: true, careTeamFhirId: data.id };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : "Network error" };
+    }
+  }
+
   try {
     const fhirResource = mapAppCareTeamMemberToFhirCareTeam(member, patientFhirId);
     delete (fhirResource as any).id;

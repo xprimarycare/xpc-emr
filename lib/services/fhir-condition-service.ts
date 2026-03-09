@@ -4,6 +4,7 @@ import {
   mapFhirBundleToConditions,
   mapAppConditionToFhirCondition,
 } from "@/lib/phenoml/fhir-mapper";
+import { isLocalBackendClient } from "@/lib/emr-backend";
 
 export interface ResolvedDiagnosisCode {
   code: string;
@@ -80,6 +81,27 @@ export function parseDiagnosisText(text: string): string[] {
 export async function searchDiagnosisCodes(
   text: string
 ): Promise<DiagnosisCodeSearchResult> {
+  if (isLocalBackendClient()) {
+    try {
+      const params = new URLSearchParams({ text, category: "condition", limit: "5" });
+      const response = await fetch(`/api/clinical/catalog?${params}`);
+      const data = await response.json();
+      if (!response.ok) {
+        return { codes: [], error: data.error || "Failed to search diagnosis codes" };
+      }
+      const codes: ResolvedDiagnosisCode[] = (data.codes || []).map((c: any) => ({
+        code: c.code,
+        description: c.display,
+      }));
+      return { codes };
+    } catch (error) {
+      return {
+        codes: [],
+        error: error instanceof Error ? error.message : "Network error",
+      };
+    }
+  }
+
   try {
     const params = new URLSearchParams({
       codesystem: "ICD10CM",
@@ -165,11 +187,34 @@ export interface ConditionSearchResult {
 }
 
 /**
- * Fetch a patient's conditions from Medplum via PhenoML
+ * Fetch a patient's conditions from EMR
  */
 export async function searchFhirConditions(
   patientFhirId: string
 ): Promise<ConditionSearchResult> {
+  if (isLocalBackendClient()) {
+    try {
+      const response = await fetch(
+        `/api/clinical/condition?patient=${encodeURIComponent(patientFhirId)}`
+      );
+      const data = await response.json();
+      if (!response.ok) {
+        return { conditions: [], total: 0, error: data.error || "Failed to fetch conditions" };
+      }
+      const conditions: AppCondition[] = (data.items || []).map((item: any) => ({
+        ...item,
+        fhirId: item.id,
+      }));
+      return { conditions, total: data.total ?? conditions.length };
+    } catch (error) {
+      return {
+        conditions: [],
+        total: 0,
+        error: error instanceof Error ? error.message : "Network error",
+      };
+    }
+  }
+
   try {
     const response = await fetch(
       `/api/fhir/condition?patient=${encodeURIComponent(patientFhirId)}`
@@ -216,16 +261,36 @@ export interface ConditionUpsertResult {
 }
 
 /**
- * Write a condition back to Medplum via PUT upsert.
+ * Write a condition back via PUT upsert.
  */
 export async function upsertFhirCondition(
   condition: AppCondition,
   patientFhirId: string
 ): Promise<ConditionUpsertResult> {
+  if (isLocalBackendClient()) {
+    try {
+      const response = await fetch("/api/clinical/condition", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...condition, id: condition.fhirId, patientId: patientFhirId }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        return { success: false, error: data.error || "Failed to save condition" };
+      }
+      return { success: true };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : "Network error",
+      };
+    }
+  }
+
   if (!condition.fhirId) {
     return {
       success: false,
-      error: "Condition has no FHIR ID - cannot write back to Medplum",
+      error: "Condition has no FHIR ID - cannot update without an ID",
     };
   }
 
@@ -248,7 +313,7 @@ export async function upsertFhirCondition(
     if (!response.ok) {
       return {
         success: false,
-        error: data.error || "Failed to save condition to Medplum",
+        error: data.error || "Failed to save condition",
       };
     }
 
@@ -267,11 +332,30 @@ export interface ConditionDeleteResult {
 }
 
 /**
- * Delete a condition from Medplum via DELETE.
+ * Delete a condition from EMR via DELETE.
  */
 export async function deleteFhirCondition(
   conditionFhirId: string
 ): Promise<ConditionDeleteResult> {
+  if (isLocalBackendClient()) {
+    try {
+      const response = await fetch(
+        `/api/clinical/condition?id=${encodeURIComponent(conditionFhirId)}`,
+        { method: "DELETE" }
+      );
+      const data = await response.json();
+      if (!response.ok) {
+        return { success: false, error: data.error || "Failed to delete condition" };
+      }
+      return { success: true };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : "Network error",
+      };
+    }
+  }
+
   try {
     const response = await fetch(
       `/api/fhir/condition?id=${encodeURIComponent(conditionFhirId)}`,
@@ -288,7 +372,7 @@ export async function deleteFhirCondition(
     if (!response.ok) {
       return {
         success: false,
-        error: data.error || "Failed to delete condition from Medplum",
+        error: data.error || "Failed to delete condition",
       };
     }
 
@@ -308,15 +392,35 @@ export interface ConditionCreateResult {
 }
 
 /**
- * Create a new condition in Medplum via POST.
+ * Create a new condition via POST.
  */
 export async function createFhirCondition(
   condition: AppCondition,
   patientFhirId: string
 ): Promise<ConditionCreateResult> {
+  if (isLocalBackendClient()) {
+    try {
+      const response = await fetch("/api/clinical/condition", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...condition, patientId: patientFhirId }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        return { success: false, error: data.error || "Failed to create condition" };
+      }
+      return { success: true, conditionFhirId: data.id };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : "Network error",
+      };
+    }
+  }
+
   try {
     const fhirResource = mapAppConditionToFhirCondition(condition, patientFhirId);
-    // Remove id for creation (let Medplum assign it)
+    // Remove id for creation (let the backend assign it)
     delete (fhirResource as any).id;
 
     const response = await fetch("/api/fhir/condition", {
@@ -335,7 +439,7 @@ export async function createFhirCondition(
     if (!response.ok) {
       return {
         success: false,
-        error: data.error || "Failed to create condition in Medplum",
+        error: data.error || "Failed to create condition",
       };
     }
 

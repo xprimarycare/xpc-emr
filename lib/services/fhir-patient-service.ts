@@ -4,6 +4,7 @@ import {
   mapFhirBundleToPatients,
   mapAppPatientToFhirPatient,
 } from "@/lib/phenoml/fhir-mapper";
+import { isLocalBackendClient } from "@/lib/emr-backend";
 
 export interface PatientSearchResult {
   patients: PatientData[];
@@ -15,6 +16,22 @@ export interface PatientSearchResult {
  * List all patients from FHIR via PhenoML (no search filter)
  */
 export async function listFhirPatients(): Promise<PatientSearchResult> {
+  if (isLocalBackendClient()) {
+    try {
+      const response = await fetch("/api/clinical/patient");
+      const data = await response.json();
+      if (!response.ok) {
+        return { patients: [], total: 0, error: data.error || "Failed to list patients" };
+      }
+      return {
+        patients: data.items.map((i: any) => ({ ...i, fhirId: i.id })),
+        total: data.total,
+      };
+    } catch (error) {
+      return { patients: [], total: 0, error: error instanceof Error ? error.message : "Network error" };
+    }
+  }
+
   try {
     const response = await fetch("/api/fhir/patient");
 
@@ -57,6 +74,22 @@ export async function listFhirPatients(): Promise<PatientSearchResult> {
  * Search for patients in FHIR via PhenoML
  */
 export async function searchFhirPatients(name: string): Promise<PatientSearchResult> {
+  if (isLocalBackendClient()) {
+    try {
+      const response = await fetch(`/api/clinical/patient?name=${encodeURIComponent(name)}`);
+      const data = await response.json();
+      if (!response.ok) {
+        return { patients: [], total: 0, error: data.error || "Failed to search patients" };
+      }
+      return {
+        patients: data.items.map((i: any) => ({ ...i, fhirId: i.id })),
+        total: data.total,
+      };
+    } catch (error) {
+      return { patients: [], total: 0, error: error instanceof Error ? error.message : "Network error" };
+    }
+  }
+
   try {
     const response = await fetch(
       `/api/fhir/patient?name=${encodeURIComponent(name)}`
@@ -104,7 +137,7 @@ export interface PatientCreateResult {
 }
 
 /**
- * Create a new patient in Medplum via PhenoML lang2fhir.
+ * Create a new patient in EMR lang2fhir.
  * Returns the server-assigned fhirId on success.
  */
 export async function createFhirPatient(patient: {
@@ -112,6 +145,23 @@ export async function createFhirPatient(patient: {
   sex: string;
   dob: string;
 }): Promise<PatientCreateResult> {
+  if (isLocalBackendClient()) {
+    try {
+      const response = await fetch("/api/clinical/patient", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: patient.name, sex: patient.sex, dob: patient.dob }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        return { success: false, error: data.error || "Failed to create patient" };
+      }
+      return { success: true, fhirId: data.id };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : "Network error" };
+    }
+  }
+
   try {
     const response = await fetch("/api/fhir/patient", {
       method: "POST",
@@ -133,7 +183,7 @@ export async function createFhirPatient(patient: {
     if (!response.ok) {
       return {
         success: false,
-        error: data.error || "Failed to create patient in Medplum",
+        error: data.error || "Failed to create patient",
       };
     }
 
@@ -152,16 +202,41 @@ export interface PatientUpsertResult {
 }
 
 /**
- * Write patient data back to Medplum via PUT upsert.
+ * Write patient data back via PUT upsert.
  * Only works for FHIR-imported patients (those with a fhirId).
  */
 export async function upsertFhirPatient(
   patient: Patient
 ): Promise<PatientUpsertResult> {
+  if (isLocalBackendClient()) {
+    try {
+      const response = await fetch("/api/clinical/patient", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: patient.fhirId,
+          name: patient.name,
+          dob: patient.dob,
+          sex: patient.sex,
+          mrn: patient.mrn,
+          avatar: patient.avatar,
+          summary: patient.summary,
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        return { success: false, error: data.error || "Failed to update patient" };
+      }
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : "Network error" };
+    }
+  }
+
   if (!patient.fhirId) {
     return {
       success: false,
-      error: "Patient has no FHIR ID - cannot write back to Medplum",
+      error: "Patient has no FHIR ID - cannot update without an ID",
     };
   }
 
@@ -184,7 +259,7 @@ export async function upsertFhirPatient(
     if (!response.ok) {
       return {
         success: false,
-        error: data.error || "Failed to save patient to Medplum",
+        error: data.error || "Failed to save patient",
       };
     }
 

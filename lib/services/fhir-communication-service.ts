@@ -5,6 +5,7 @@ import {
   mapAppMessageToFhirCommunication,
   buildFhirThreadHeader,
 } from "@/lib/phenoml/fhir-mapper";
+import { isLocalBackendClient } from "@/lib/emr-backend";
 
 // ─── Result types ────────────────────────────────────────
 
@@ -33,6 +34,22 @@ export interface ThreadCreateResult {
 export async function searchFhirThreads(
   patientFhirId: string
 ): Promise<ThreadSearchResult> {
+  if (isLocalBackendClient()) {
+    try {
+      const res = await fetch(
+        `/api/clinical/communication?patient=${encodeURIComponent(patientFhirId)}`
+      );
+      const data = await res.json();
+      if (!res.ok) {
+        return { threads: [], error: data.error || "Failed to fetch messages" };
+      }
+      const threads = (data.items || []).map((item: any) => ({ ...item, fhirId: item.id }));
+      return { threads };
+    } catch (error) {
+      return { threads: [], error: error instanceof Error ? error.message : "Network error" };
+    }
+  }
+
   try {
     const response = await fetch(
       `/api/fhir/communication?patient=${encodeURIComponent(patientFhirId)}`
@@ -69,6 +86,23 @@ export async function createFhirThread(
   practitionerId: string,
   topic?: string
 ): Promise<ThreadCreateResult> {
+  if (isLocalBackendClient()) {
+    try {
+      const res = await fetch("/api/clinical/communication", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ patientId: patientFhirId, topic }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        return { success: false, error: data.error || "Failed to create thread" };
+      }
+      return { success: true, threadId: data.id };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : "Network error" };
+    }
+  }
+
   try {
     const fhirResource = buildFhirThreadHeader(
       `Patient/${patientFhirId}`,
@@ -112,6 +146,36 @@ export async function sendFhirMessage(
   practitionerId: string,
   threadId?: string
 ): Promise<MessageSendResult & { threadId?: string }> {
+  if (isLocalBackendClient()) {
+    try {
+      let actualThreadId = threadId;
+      if (!actualThreadId) {
+        const threadResult = await createFhirThread(patientFhirId, practitionerId);
+        if (!threadResult.success || !threadResult.threadId) {
+          return { success: false, error: threadResult.error || "Failed to create thread" };
+        }
+        actualThreadId = threadResult.threadId;
+      }
+      const res = await fetch("/api/clinical/communication", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          threadId: actualThreadId,
+          senderType: "provider",
+          senderRef: practitionerId,
+          text,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        return { success: false, error: data.error || "Failed to send message" };
+      }
+      return { success: true, messageId: data.id, threadId: actualThreadId };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : "Network error" };
+    }
+  }
+
   try {
     // If no thread exists, create one first
     let actualThreadId = threadId;

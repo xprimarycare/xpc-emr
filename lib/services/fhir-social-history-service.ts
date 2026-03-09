@@ -8,6 +8,7 @@ import {
   SOCIAL_HISTORY_CATEGORIES,
   SocialHistoryCategory,
 } from "@/lib/data/social-history-categories";
+import { isLocalBackendClient } from "@/lib/emr-backend";
 
 export interface ResolvedSocialHistoryCode {
   code: string;
@@ -92,6 +93,10 @@ export function classifyByKeywords(
 async function classifyBySemantic(
   text: string
 ): Promise<SocialHistoryCategory | null> {
+  if (isLocalBackendClient()) {
+    return null;
+  }
+
   const result = await searchSocialHistoryCodes(text);
   if (result.error || result.codes.length === 0) return null;
 
@@ -183,6 +188,23 @@ export interface SocialHistoryCodeSearchResult {
 export async function searchSocialHistoryCodes(
   text: string
 ): Promise<SocialHistoryCodeSearchResult> {
+  if (isLocalBackendClient()) {
+    try {
+      const params = new URLSearchParams({ text, category: "social-history", limit: "5" });
+      const response = await fetch(`/api/clinical/catalog?${params}`);
+      const data = await response.json();
+      if (!response.ok) {
+        return { codes: [], error: data.error || "Failed to search social history codes" };
+      }
+      const codes: ResolvedSocialHistoryCode[] = (data.codes || []).map(
+        (c: any) => ({ code: c.code, description: c.display })
+      );
+      return { codes };
+    } catch (error) {
+      return { codes: [], error: error instanceof Error ? error.message : "Network error" };
+    }
+  }
+
   try {
     const params = new URLSearchParams({
       codesystem: "LOINC",
@@ -267,6 +289,22 @@ export interface SocialHistorySearchResult {
 export async function searchFhirSocialHistories(
   patientFhirId: string
 ): Promise<SocialHistorySearchResult> {
+  if (isLocalBackendClient()) {
+    try {
+      const response = await fetch(
+        `/api/clinical/social-history?patient=${encodeURIComponent(patientFhirId)}`
+      );
+      const data = await response.json();
+      if (!response.ok) {
+        return { observations: [], total: 0, error: data.error || "Failed to fetch social history" };
+      }
+      const observations = (data.items || []).map((item: any) => ({ ...item, fhirId: item.id }));
+      return { observations, total: data.total ?? observations.length };
+    } catch (error) {
+      return { observations: [], total: 0, error: error instanceof Error ? error.message : "Network error" };
+    }
+  }
+
   try {
     const response = await fetch(
       `/api/fhir/social-history?patient=${encodeURIComponent(patientFhirId)}`
@@ -316,10 +354,27 @@ export async function upsertFhirSocialHistory(
   observation: AppSocialHistoryObservation,
   patientFhirId: string
 ): Promise<SocialHistoryUpsertResult> {
+  if (isLocalBackendClient()) {
+    try {
+      const response = await fetch("/api/clinical/social-history", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...observation, id: observation.fhirId, patientId: patientFhirId }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        return { success: false, error: data.error || "Failed to save social history" };
+      }
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : "Network error" };
+    }
+  }
+
   if (!observation.fhirId) {
     return {
       success: false,
-      error: "Observation has no FHIR ID - cannot write back to Medplum",
+      error: "Observation has no FHIR ID - cannot update without an ID",
     };
   }
 
@@ -345,7 +400,7 @@ export async function upsertFhirSocialHistory(
     if (!response.ok) {
       return {
         success: false,
-        error: data.error || "Failed to save social history to Medplum",
+        error: data.error || "Failed to save social history",
       };
     }
 
@@ -366,6 +421,22 @@ export interface SocialHistoryDeleteResult {
 export async function deleteFhirSocialHistory(
   observationFhirId: string
 ): Promise<SocialHistoryDeleteResult> {
+  if (isLocalBackendClient()) {
+    try {
+      const response = await fetch(
+        `/api/clinical/social-history?id=${encodeURIComponent(observationFhirId)}`,
+        { method: "DELETE" }
+      );
+      const data = await response.json();
+      if (!response.ok) {
+        return { success: false, error: data.error || "Failed to delete social history" };
+      }
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : "Network error" };
+    }
+  }
+
   try {
     const response = await fetch(
       `/api/fhir/social-history?id=${encodeURIComponent(observationFhirId)}`,
@@ -382,7 +453,7 @@ export async function deleteFhirSocialHistory(
     if (!response.ok) {
       return {
         success: false,
-        error: data.error || "Failed to delete social history from Medplum",
+        error: data.error || "Failed to delete social history",
       };
     }
 
@@ -405,6 +476,23 @@ export async function createFhirSocialHistory(
   observation: AppSocialHistoryObservation,
   patientFhirId: string
 ): Promise<SocialHistoryCreateResult> {
+  if (isLocalBackendClient()) {
+    try {
+      const response = await fetch("/api/clinical/social-history", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...observation, patientId: patientFhirId }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        return { success: false, error: data.error || "Failed to create social history" };
+      }
+      return { success: true, observationFhirId: data.id };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : "Network error" };
+    }
+  }
+
   try {
     const fhirResource = mapAppSocialHistoryToFhirObservation(
       observation,
@@ -428,7 +516,7 @@ export async function createFhirSocialHistory(
     if (!response.ok) {
       return {
         success: false,
-        error: data.error || "Failed to create social history in Medplum",
+        error: data.error || "Failed to create social history",
       };
     }
 

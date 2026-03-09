@@ -4,6 +4,7 @@ import {
   mapFhirBundleToProcedures,
   mapAppProcedureToFhirProcedure,
 } from "@/lib/phenoml/fhir-mapper";
+import { isLocalBackendClient } from "@/lib/emr-backend";
 
 export interface ResolvedProcedureCode {
   code: string;
@@ -64,6 +65,23 @@ export interface ProcedureCodeSearchResult {
 export async function searchProcedureCodes(
   text: string
 ): Promise<ProcedureCodeSearchResult> {
+  if (isLocalBackendClient()) {
+    try {
+      const params = new URLSearchParams({ text, category: "procedure", limit: "5" });
+      const response = await fetch(`/api/clinical/catalog?${params}`);
+      const data = await response.json();
+      if (!response.ok) {
+        return { codes: [], error: data.error || "Failed to search procedure codes" };
+      }
+      const codes: ResolvedProcedureCode[] = (data.codes || []).map(
+        (c: any) => ({ code: c.code, description: c.display })
+      );
+      return { codes };
+    } catch (error) {
+      return { codes: [], error: error instanceof Error ? error.message : "Network error" };
+    }
+  }
+
   try {
     const params = new URLSearchParams({
       codesystem: "SNOMEDCT",
@@ -148,6 +166,24 @@ export interface ProcedureSearchResult {
 export async function searchFhirProcedures(
   patientFhirId: string
 ): Promise<ProcedureSearchResult> {
+  if (isLocalBackendClient()) {
+    try {
+      const response = await fetch(
+        `/api/clinical/procedure?patient=${encodeURIComponent(patientFhirId)}`
+      );
+      const data = await response.json();
+      if (!response.ok) {
+        return { procedures: [], total: 0, error: data.error || "Failed to fetch procedures" };
+      }
+      const procedures: AppProcedure[] = (data.items || []).map(
+        (item: any) => ({ ...item, fhirId: item.id })
+      );
+      return { procedures, total: data.total ?? procedures.length };
+    } catch (error) {
+      return { procedures: [], total: 0, error: error instanceof Error ? error.message : "Network error" };
+    }
+  }
+
   try {
     const response = await fetch(
       `/api/fhir/procedure?patient=${encodeURIComponent(patientFhirId)}`
@@ -197,10 +233,27 @@ export async function upsertFhirProcedure(
   procedure: AppProcedure,
   patientFhirId: string
 ): Promise<ProcedureUpsertResult> {
+  if (isLocalBackendClient()) {
+    try {
+      const response = await fetch("/api/clinical/procedure", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...procedure, id: procedure.fhirId, patientId: patientFhirId }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        return { success: false, error: data.error || "Failed to save procedure" };
+      }
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : "Network error" };
+    }
+  }
+
   if (!procedure.fhirId) {
     return {
       success: false,
-      error: "Procedure has no FHIR ID - cannot write back to Medplum",
+      error: "Procedure has no FHIR ID - cannot update without an ID",
     };
   }
 
@@ -226,7 +279,7 @@ export async function upsertFhirProcedure(
     if (!response.ok) {
       return {
         success: false,
-        error: data.error || "Failed to save procedure to Medplum",
+        error: data.error || "Failed to save procedure",
       };
     }
 
@@ -247,6 +300,22 @@ export interface ProcedureDeleteResult {
 export async function deleteFhirProcedure(
   procedureFhirId: string
 ): Promise<ProcedureDeleteResult> {
+  if (isLocalBackendClient()) {
+    try {
+      const response = await fetch(
+        `/api/clinical/procedure?id=${encodeURIComponent(procedureFhirId)}`,
+        { method: "DELETE" }
+      );
+      const data = await response.json();
+      if (!response.ok) {
+        return { success: false, error: data.error || "Failed to delete procedure" };
+      }
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : "Network error" };
+    }
+  }
+
   try {
     const response = await fetch(
       `/api/fhir/procedure?id=${encodeURIComponent(procedureFhirId)}`,
@@ -263,7 +332,7 @@ export async function deleteFhirProcedure(
     if (!response.ok) {
       return {
         success: false,
-        error: data.error || "Failed to delete procedure from Medplum",
+        error: data.error || "Failed to delete procedure",
       };
     }
 
@@ -286,6 +355,23 @@ export async function createFhirProcedure(
   procedure: AppProcedure,
   patientFhirId: string
 ): Promise<ProcedureCreateResult> {
+  if (isLocalBackendClient()) {
+    try {
+      const response = await fetch("/api/clinical/procedure", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...procedure, patientId: patientFhirId }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        return { success: false, error: data.error || "Failed to create procedure" };
+      }
+      return { success: true, procedureFhirId: data.id };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : "Network error" };
+    }
+  }
+
   try {
     const fhirResource = mapAppProcedureToFhirProcedure(
       procedure,
@@ -309,7 +395,7 @@ export async function createFhirProcedure(
     if (!response.ok) {
       return {
         success: false,
-        error: data.error || "Failed to create procedure in Medplum",
+        error: data.error || "Failed to create procedure",
       };
     }
 
