@@ -143,7 +143,7 @@ export function TaskTab() {
     return tmp.textContent || tmp.innerText || '';
   }
 
-  const handleSaveToMedplum = async () => {
+  const handleSave = async () => {
     if (!activePatient?.fhirId || !activeTabId) return;
 
     const htmlContent = tabContent[activeTabId] || activeTab?.content || '';
@@ -233,11 +233,11 @@ export function TaskTab() {
 
           {/* Status indicators */}
           {status === 'saving' && (
-            <span className="text-xs text-blue-600">Saving to Medplum...</span>
+            <span className="text-xs text-blue-600">Saving...</span>
           )}
           {status === 'success' && (
             <span className="text-xs text-green-600">
-              {taskFhirId ? 'Saved to Medplum' : 'Created in Medplum'}
+              {taskFhirId ? 'Saved' : 'Created'}
             </span>
           )}
           {status === 'error' && error && (
@@ -245,15 +245,15 @@ export function TaskTab() {
           )}
 
           <button
-            onClick={handleSaveToMedplum}
+            onClick={handleSave}
             disabled={status === 'saving'}
             className="px-4 py-1.5 bg-blue-600 text-white rounded text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {status === 'saving'
               ? 'Saving...'
               : taskFhirId
-                ? 'Update in Medplum'
-                : 'Save to Medplum'}
+                ? 'Update'
+                : 'Save'}
           </button>
         </div>
       )}

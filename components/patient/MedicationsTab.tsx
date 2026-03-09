@@ -67,7 +67,7 @@ export function MedicationsTab({ refreshKey }: { refreshKey?: number }) {
     setEditingId(null);
     setEditForm({});
 
-    // Write to Medplum
+    // Write to EMR
     setStatus('saving');
     setError(null);
     const result = await upsertFhirMedication(updated, activePatient.fhirId);
@@ -103,13 +103,13 @@ export function MedicationsTab({ refreshKey }: { refreshKey?: number }) {
 
           {status === 'success' && (
             <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-md text-sm text-green-700">
-              Saved to Medplum
+              Saved
             </div>
           )}
 
           {status === 'saving' && (
             <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-md text-sm text-blue-700">
-              Saving to Medplum...
+              Saving...
             </div>
           )}
 
@@ -123,7 +123,7 @@ export function MedicationsTab({ refreshKey }: { refreshKey?: number }) {
           {/* Empty state */}
           {status !== 'loading' && medications.length === 0 && status !== 'error' && (
             <div className="text-gray-400 text-sm text-center py-8">
-              No medications found in Medplum
+              No medications found in EMR
             </div>
           )}
 
@@ -131,7 +131,7 @@ export function MedicationsTab({ refreshKey }: { refreshKey?: number }) {
           {medications.length > 0 && (
             <div className="space-y-3">
               <p className="text-xs text-gray-500 mb-2">
-                {medications.length} medication{medications.length !== 1 ? 's' : ''} from Medplum
+                {medications.length} medication{medications.length !== 1 ? 's' : ''} from EMR
               </p>
               {medications.map((med) => (
                 <div
@@ -226,7 +226,7 @@ export function MedicationsTab({ refreshKey }: { refreshKey?: number }) {
 
           {isFhirPatient && status === 'idle' && (
             <p className="text-xs text-gray-400 text-center mt-4">
-              Changes will be saved to Medplum
+              Changes will be saved to EMR
             </p>
           )}
       </div>

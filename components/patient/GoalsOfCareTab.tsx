@@ -111,7 +111,7 @@ export function GoalsOfCareTab({ refreshKey }: { refreshKey?: number }) {
     }
   };
 
-  const handleSyncToMedplum = async () => {
+  const handleSync = async () => {
     if (!activePatient?.fhirId) return;
 
     const text = editorRef.current?.innerText || '';
@@ -135,7 +135,7 @@ export function GoalsOfCareTab({ refreshKey }: { refreshKey?: number }) {
 
     setResolvedEntries(resolved.entries);
 
-    // Step 2: Create each as a Goal in Medplum
+    // Step 2: Create each as a Goal in EMR
     setSyncStatus('syncing');
     let allSuccess = true;
 
@@ -168,7 +168,7 @@ export function GoalsOfCareTab({ refreshKey }: { refreshKey?: number }) {
       setSyncStatus('success');
       setTimeout(() => setSyncStatus('idle'), 2000);
 
-      // Re-fetch goals list from Medplum
+      // Re-fetch goals list from EMR
       const refreshed = await searchFhirGoals(activePatient.fhirId);
       if (!refreshed.error) {
         setGoals(refreshed.goals);
@@ -215,13 +215,13 @@ export function GoalsOfCareTab({ refreshKey }: { refreshKey?: number }) {
 
           {status === 'success' && (
             <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-md text-sm text-green-700">
-              Saved to Medplum
+              Saved
             </div>
           )}
 
           {status === 'saving' && (
             <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-md text-sm text-blue-700">
-              Saving to Medplum...
+              Saving...
             </div>
           )}
 
@@ -235,7 +235,7 @@ export function GoalsOfCareTab({ refreshKey }: { refreshKey?: number }) {
           {/* Empty state */}
           {status !== 'loading' && goals.length === 0 && status !== 'error' && (
             <div className="text-gray-400 text-sm text-center py-8">
-              No goals found in Medplum
+              No goals found in EMR
             </div>
           )}
 
@@ -243,7 +243,7 @@ export function GoalsOfCareTab({ refreshKey }: { refreshKey?: number }) {
           {goals.length > 0 && (
             <div className="space-y-3">
               <p className="text-xs text-gray-500 mb-2">
-                {goals.length} goal{goals.length !== 1 ? 's' : ''} from Medplum
+                {goals.length} goal{goals.length !== 1 ? 's' : ''} from EMR
               </p>
               {goals.map((goal) => (
                 <div
@@ -349,7 +349,7 @@ export function GoalsOfCareTab({ refreshKey }: { refreshKey?: number }) {
 
           {isFhirPatient && status === 'idle' && goals.length > 0 && (
             <p className="text-xs text-gray-400 text-center mt-4">
-              Click a goal to edit · Changes will be saved to Medplum
+              Click a goal to edit · Changes will be saved to EMR
             </p>
           )}
         </div>
@@ -360,7 +360,7 @@ export function GoalsOfCareTab({ refreshKey }: { refreshKey?: number }) {
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-semibold">Add Goals</h2>
               <button
-                onClick={handleSyncToMedplum}
+                onClick={handleSync}
                 disabled={syncStatus === 'resolving' || syncStatus === 'syncing'}
                 className="px-4 py-1.5 bg-blue-600 text-white rounded text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
@@ -368,7 +368,7 @@ export function GoalsOfCareTab({ refreshKey }: { refreshKey?: number }) {
                   ? 'Resolving...'
                   : syncStatus === 'syncing'
                     ? 'Syncing...'
-                    : 'Sync to Medplum'}
+                    : 'Sync'}
               </button>
             </div>
 
@@ -387,7 +387,7 @@ export function GoalsOfCareTab({ refreshKey }: { refreshKey?: number }) {
 
             {syncStatus === 'success' && (
               <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-md text-sm text-green-700">
-                Goals synced to Medplum
+                Goals synced
               </div>
             )}
 
@@ -399,7 +399,7 @@ export function GoalsOfCareTab({ refreshKey }: { refreshKey?: number }) {
 
             {syncStatus === 'syncing' && (
               <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-md text-sm text-blue-700">
-                Creating goals in Medplum...
+                Creating goals...
               </div>
             )}
 

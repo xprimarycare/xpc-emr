@@ -44,7 +44,7 @@ export function PageMetadataBar({ showNote, onToggleNote, labView, onLabViewChan
   const [status, setStatus] = useState<SaveStatus>('idle');
   const [error, setError] = useState<string | null>(null);
 
-  const handleSaveToMedplum = async () => {
+  const handleSave = async () => {
     // TODO: Implement FHIR save — determine resource type (DocumentReference, etc.)
     // For now, just flash a placeholder status
     setStatus('saving');
@@ -152,10 +152,10 @@ export function PageMetadataBar({ showNote, onToggleNote, labView, onLabViewChan
       <div className="flex-1" />
 
       {status === 'saving' && (
-        <span className="text-xs text-blue-600">Saving to Medplum...</span>
+        <span className="text-xs text-blue-600">Saving...</span>
       )}
       {status === 'success' && (
-        <span className="text-xs text-green-600">Saved to Medplum</span>
+        <span className="text-xs text-green-600">Saved</span>
       )}
       {status === 'error' && error && (
         <span className="text-xs text-red-600">{error}</span>
@@ -201,11 +201,11 @@ export function PageMetadataBar({ showNote, onToggleNote, labView, onLabViewChan
       )}
 
       <button
-        onClick={handleSaveToMedplum}
+        onClick={handleSave}
         disabled={status === 'saving'}
         className="px-4 py-1.5 bg-blue-600 text-white rounded text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
       >
-        {status === 'saving' ? 'Saving...' : 'Save to Medplum'}
+        {status === 'saving' ? 'Saving...' : 'Save'}
       </button>
     </div>
   );

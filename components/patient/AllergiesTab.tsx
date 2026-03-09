@@ -111,7 +111,7 @@ export function AllergiesTab({ refreshKey }: { refreshKey?: number }) {
     }
   };
 
-  const handleSyncToMedplum = async () => {
+  const handleSync = async () => {
     if (!activePatient?.fhirId) return;
 
     const text = editorRef.current?.innerText || '';
@@ -135,7 +135,7 @@ export function AllergiesTab({ refreshKey }: { refreshKey?: number }) {
 
     setResolvedEntries(resolved.entries);
 
-    // Step 2: Create each as an AllergyIntolerance in Medplum
+    // Step 2: Create each as an AllergyIntolerance in EMR
     setSyncStatus('syncing');
     let allSuccess = true;
 
@@ -174,7 +174,7 @@ export function AllergiesTab({ refreshKey }: { refreshKey?: number }) {
       setSyncStatus('success');
       setTimeout(() => setSyncStatus('idle'), 2000);
 
-      // Re-fetch allergies list from Medplum
+      // Re-fetch allergies list from EMR
       const refreshed = await searchFhirAllergies(activePatient.fhirId);
       if (!refreshed.error) {
         setAllergies(refreshed.allergies);
@@ -209,13 +209,13 @@ export function AllergiesTab({ refreshKey }: { refreshKey?: number }) {
 
           {status === 'success' && (
             <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-md text-sm text-green-700">
-              Saved to Medplum
+              Saved
             </div>
           )}
 
           {status === 'saving' && (
             <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-md text-sm text-blue-700">
-              Saving to Medplum...
+              Saving...
             </div>
           )}
 
@@ -229,7 +229,7 @@ export function AllergiesTab({ refreshKey }: { refreshKey?: number }) {
           {/* Empty state */}
           {status !== 'loading' && allergies.length === 0 && status !== 'error' && (
             <div className="text-gray-400 text-sm text-center py-8">
-              No allergies found in Medplum
+              No allergies found in EMR
             </div>
           )}
 
@@ -237,7 +237,7 @@ export function AllergiesTab({ refreshKey }: { refreshKey?: number }) {
           {allergies.length > 0 && (
             <div className="space-y-3">
               <p className="text-xs text-gray-500 mb-2">
-                {allergies.length} allerg{allergies.length !== 1 ? 'ies' : 'y'} from Medplum
+                {allergies.length} allerg{allergies.length !== 1 ? 'ies' : 'y'} from EMR
               </p>
               {allergies.map((allergy) => (
                 <div
@@ -376,7 +376,7 @@ export function AllergiesTab({ refreshKey }: { refreshKey?: number }) {
 
           {isFhirPatient && status === 'idle' && allergies.length > 0 && (
             <p className="text-xs text-gray-400 text-center mt-4">
-              Click an allergy to edit · Changes will be saved to Medplum
+              Click an allergy to edit · Changes will be saved to EMR
             </p>
           )}
         </div>
@@ -387,7 +387,7 @@ export function AllergiesTab({ refreshKey }: { refreshKey?: number }) {
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-semibold">Add Allergies</h2>
               <button
-                onClick={handleSyncToMedplum}
+                onClick={handleSync}
                 disabled={syncStatus === 'resolving' || syncStatus === 'syncing'}
                 className="px-4 py-1.5 bg-blue-600 text-white rounded text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
@@ -395,7 +395,7 @@ export function AllergiesTab({ refreshKey }: { refreshKey?: number }) {
                   ? 'Resolving...'
                   : syncStatus === 'syncing'
                     ? 'Syncing...'
-                    : 'Sync to Medplum'}
+                    : 'Sync'}
               </button>
             </div>
 
@@ -414,7 +414,7 @@ export function AllergiesTab({ refreshKey }: { refreshKey?: number }) {
 
             {syncStatus === 'success' && (
               <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-md text-sm text-green-700">
-                Allergies synced to Medplum
+                Allergies synced
               </div>
             )}
 
@@ -426,7 +426,7 @@ export function AllergiesTab({ refreshKey }: { refreshKey?: number }) {
 
             {syncStatus === 'syncing' && (
               <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-md text-sm text-blue-700">
-                Creating allergies in Medplum...
+                Creating allergies...
               </div>
             )}
 

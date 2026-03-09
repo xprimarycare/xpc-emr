@@ -216,13 +216,13 @@ export function SocialHistoryTab({ refreshKey }: { refreshKey?: number }) {
 
           {status === 'success' && (
             <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-md text-sm text-green-700">
-              Saved to Medplum
+              Saved
             </div>
           )}
 
           {status === 'saving' && (
             <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-md text-sm text-blue-700">
-              Saving to Medplum...
+              Saving...
             </div>
           )}
 
@@ -236,7 +236,7 @@ export function SocialHistoryTab({ refreshKey }: { refreshKey?: number }) {
           {/* Empty state */}
           {status !== 'loading' && observations.length === 0 && status !== 'error' && (
             <div className="text-gray-400 text-sm text-center py-8">
-              No social history observations found in Medplum
+              No social history observations found in EMR
             </div>
           )}
 
@@ -244,7 +244,7 @@ export function SocialHistoryTab({ refreshKey }: { refreshKey?: number }) {
           {observations.length > 0 && (
             <div className="space-y-3">
               <p className="text-xs text-gray-500 mb-2">
-                {observations.length} observation{observations.length !== 1 ? 's' : ''} from Medplum
+                {observations.length} observation{observations.length !== 1 ? 's' : ''} from EMR
               </p>
               {observations.map((obs) => (
                 <div
@@ -341,7 +341,7 @@ export function SocialHistoryTab({ refreshKey }: { refreshKey?: number }) {
 
           {isFhirPatient && status === 'idle' && observations.length > 0 && (
             <p className="text-xs text-gray-400 text-center mt-4">
-              Click an observation to edit · Changes will be saved to Medplum
+              Click an observation to edit · Changes will be saved to EMR
             </p>
           )}
         </div>
@@ -362,7 +362,7 @@ export function SocialHistoryTab({ refreshKey }: { refreshKey?: number }) {
                     ? 'Creating...'
                     : syncStatus === 'preview'
                       ? 'Review below'
-                      : 'Sync to Medplum'}
+                      : 'Sync'}
               </button>
             </div>
 
@@ -381,7 +381,7 @@ export function SocialHistoryTab({ refreshKey }: { refreshKey?: number }) {
 
             {syncStatus === 'success' && (
               <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-md text-sm text-green-700">
-                Social history synced to Medplum
+                Social history synced
               </div>
             )}
 
@@ -393,7 +393,7 @@ export function SocialHistoryTab({ refreshKey }: { refreshKey?: number }) {
 
             {syncStatus === 'syncing' && (
               <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-md text-sm text-blue-700">
-                Creating observations in Medplum...
+                Creating observations...
               </div>
             )}
 
