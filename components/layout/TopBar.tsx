@@ -19,7 +19,7 @@ export function TopBar() {
   const router = useRouter();
   const { addPatient } = usePatient();
   const { toggleRightPanel } = useSidebar();
-  const { toggleLeftPanel } = useEditor();
+  const { toggleLeftPanel, leftPanelMode } = useEditor();
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const isImpersonating = !!(user as any)?.originalAdminId;
@@ -57,6 +57,11 @@ export function TopBar() {
       summary: '',
       tabs,
     });
+
+    // Switch to sidebar view so the patient panel is visible
+    if (leftPanelMode !== 'sidebar') {
+      toggleLeftPanel('sidebar');
+    }
 
     // Set active tab to Patient Info so the form shows immediately
     setTimeout(() => {

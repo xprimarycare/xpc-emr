@@ -16,6 +16,18 @@ export default auth((req) => {
     return NextResponse.next()
   }
 
+  // Clinical API routes are local-backend-only.
+  // Block them in Medplum mode to prevent prismaClinical crashes.
+  if (pathname.startsWith("/api/clinical/")) {
+    const backend = process.env.EMR_BACKEND?.toLowerCase()
+    if (backend !== "local") {
+      return NextResponse.json(
+        { error: "Clinical API is not available in Medplum mode" },
+        { status: 501 }
+      )
+    }
+  }
+
   // Check authentication
   if (!req.auth) {
     // API routes: return 401 JSON

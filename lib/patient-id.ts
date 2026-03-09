@@ -21,3 +21,17 @@ export function getPatientIdValue(patient: { fhirId?: string; id?: string }): st
   }
   return value;
 }
+
+/**
+ * Get the clinical patient ID from a UserPatient record, with fallback.
+ * Uses the backend-appropriate field, falling back to whichever ID is available
+ * (handles records created under one backend but read under another).
+ */
+export function getClinicalPatientId(
+  assignment: { patientFhirId: string; patientLocalId: string | null }
+): string {
+  const field = getPatientIdField();
+  const value = assignment[field];
+  if (value) return value;
+  return assignment.patientLocalId || assignment.patientFhirId;
+}

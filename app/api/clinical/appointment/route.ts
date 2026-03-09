@@ -2,8 +2,15 @@ import { NextRequest, NextResponse } from "next/server"
 import { requireAuth, isSession } from "@/lib/auth-helpers"
 import { prismaClinical } from "@/lib/prisma-clinical"
 import { requirePatientAccess } from "@/lib/clinical-auth"
+import { pick } from "@/lib/pick"
+import { logger } from "@/lib/logger"
 
-// GET /api/clinical/appointment?patient={id} or ?start=ge{date}&end=le{date}
+const APPOINTMENT_FIELDS = [
+  "patientId", "status", "description", "start", "end",
+  "appointmentType", "patientName",
+] as const
+
+// GET /api/clinical/appointment?patient={id} or ?startGte={date}&startLte={date}
 export async function GET(request: NextRequest) {
   const authResult = await requireAuth()
   if (!isSession(authResult)) return authResult
@@ -13,6 +20,10 @@ export async function GET(request: NextRequest) {
     const patientId = searchParams.get("patient")
     const startGte = searchParams.get("startGte")
     const startLte = searchParams.get("startLte")
+
+    if (!patientId && !startGte && !startLte) {
+      return NextResponse.json({ error: "patient or date range parameter is required" }, { status: 400 })
+    }
 
     if (patientId) {
       const forbidden = await requirePatientAccess(authResult, patientId)
@@ -36,7 +47,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ items, total: items.length })
   } catch (error) {
-    console.error("Clinical appointment search error:", error)
+    logger.error("Clinical appointment search error", error)
     return NextResponse.json({ error: "Failed to fetch appointments" }, { status: 500 })
   }
 }
@@ -52,10 +63,12 @@ export async function POST(request: NextRequest) {
       const forbidden = await requirePatientAccess(authResult, body.patientId)
       if (forbidden) return forbidden
     }
-    const item = await prismaClinical.appointment.create({ data: body })
+
+    const data = pick(body, APPOINTMENT_FIELDS)
+    const item = await prismaClinical.appointment.create({ data: data as Parameters<typeof prismaClinical.appointment.create>[0]["data"] })
     return NextResponse.json({ id: item.id })
   } catch (error) {
-    console.error("Clinical appointment create error:", error)
+    logger.error("Clinical appointment create error", error)
     return NextResponse.json({ error: "Failed to create appointment" }, { status: 500 })
   }
 }
@@ -67,16 +80,27 @@ export async function PUT(request: NextRequest) {
 
   try {
     const body = await request.json()
-    const { id, ...data } = body
+    const { id } = body
 
     if (!id) {
       return NextResponse.json({ error: "Appointment ID is required" }, { status: 400 })
     }
 
+    const existing = await prismaClinical.appointment.findUnique({ where: { id }, select: { patientId: true } })
+    if (!existing) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 })
+    }
+
+    if (existing.patientId) {
+      const forbidden = await requirePatientAccess(authResult, existing.patientId)
+      if (forbidden) return forbidden
+    }
+
+    const data = pick(body, APPOINTMENT_FIELDS.filter((f) => f !== "patientId"))
     const item = await prismaClinical.appointment.update({ where: { id }, data })
     return NextResponse.json(item)
   } catch (error) {
-    console.error("Clinical appointment update error:", error)
+    logger.error("Clinical appointment update error", error)
     return NextResponse.json({ error: "Failed to update appointment" }, { status: 500 })
   }
 }
@@ -92,10 +116,20 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: "id parameter is required" }, { status: 400 })
     }
 
+    const existing = await prismaClinical.appointment.findUnique({ where: { id }, select: { patientId: true } })
+    if (!existing) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 })
+    }
+
+    if (existing.patientId) {
+      const forbidden = await requirePatientAccess(authResult, existing.patientId)
+      if (forbidden) return forbidden
+    }
+
     await prismaClinical.appointment.delete({ where: { id } })
     return NextResponse.json({ success: true })
   } catch (error) {
-    console.error("Clinical appointment delete error:", error)
+    logger.error("Clinical appointment delete error", error)
     return NextResponse.json({ error: "Failed to delete appointment" }, { status: 500 })
   }
 }

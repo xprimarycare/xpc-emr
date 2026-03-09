@@ -43,6 +43,7 @@ next-env.d.ts
 
 # prisma
 app/generated/prisma
+app/generated/prisma-clinical
 
 # docker
 docker-compose.override.yml

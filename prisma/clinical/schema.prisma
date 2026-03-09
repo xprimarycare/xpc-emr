@@ -8,15 +8,16 @@ datasource db {
 }
 
 model Patient {
-  id        String   @id @default(cuid())
+  id        String    @id @default(cuid())
   name      String
-  mrn       String   @default("")
-  dob       String   @default("")
-  sex       String   @default("")
+  mrn       String    @default("")
+  dob       String    @default("")
+  sex       String    @default("")
   avatar    String?
   summary   String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
 
   encounters      Encounter[]
   medications     Medication[]

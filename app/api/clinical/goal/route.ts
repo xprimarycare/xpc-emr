@@ -1,7 +1,30 @@
 import { NextRequest, NextResponse } from "next/server"
+import { z } from "zod"
 import { requireAuth, isSession } from "@/lib/auth-helpers"
 import { prismaClinical } from "@/lib/prisma-clinical"
 import { requirePatientAccess } from "@/lib/clinical-auth"
+import { logger } from "@/lib/logger"
+
+const codingSchema = z.object({
+  system: z.string().optional(),
+  code: z.string().optional(),
+  display: z.string().optional(),
+}).optional()
+
+const goalSchema = z.object({
+  patientId: z.string().min(1),
+  name: z.string().min(1),
+  lifecycleStatus: z.string().optional(),
+  expressedBy: z.string().optional(),
+  startDate: z.string().optional(),
+  coding: codingSchema,
+  note: z.string().optional(),
+})
+
+const goalUpdateSchema = goalSchema.omit({ patientId: true }).partial().extend({
+  id: z.string().min(1),
+  coding: codingSchema,
+})
 
 // GET /api/clinical/goal?patient={id}
 export async function GET(request: NextRequest) {
@@ -43,7 +66,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ items, total: items.length })
   } catch (error) {
-    console.error("Clinical goal search error:", error)
+    logger.error("Clinical goal search error", error)
     return NextResponse.json({ error: "Failed to fetch goals" }, { status: 500 })
   }
 }
@@ -55,29 +78,33 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json()
-    if (!body.patientId) {
-      return NextResponse.json({ error: "patientId is required" }, { status: 400 })
+    const parsed = goalSchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: "Validation failed", details: parsed.error.flatten().fieldErrors },
+        { status: 400 },
+      )
     }
 
-    const forbidden = await requirePatientAccess(authResult, body.patientId)
+    const forbidden = await requirePatientAccess(authResult, parsed.data.patientId)
     if (forbidden) return forbidden
 
     const item = await prismaClinical.goal.create({
       data: {
-        patientId: body.patientId,
-        name: body.name,
-        lifecycleStatus: body.lifecycleStatus || "proposed",
-        expressedBy: body.expressedBy || null,
-        startDate: body.startDate || null,
-        codingSystem: body.coding?.system || null,
-        codingCode: body.coding?.code || null,
-        codingDisplay: body.coding?.display || null,
-        note: body.note || null,
+        patientId: parsed.data.patientId,
+        name: parsed.data.name,
+        lifecycleStatus: parsed.data.lifecycleStatus || "proposed",
+        expressedBy: parsed.data.expressedBy || null,
+        startDate: parsed.data.startDate || null,
+        codingSystem: parsed.data.coding?.system || null,
+        codingCode: parsed.data.coding?.code || null,
+        codingDisplay: parsed.data.coding?.display || null,
+        note: parsed.data.note || null,
       },
     })
     return NextResponse.json({ id: item.id })
   } catch (error) {
-    console.error("Clinical goal create error:", error)
+    logger.error("Clinical goal create error", error)
     return NextResponse.json({ error: "Failed to create goal" }, { status: 500 })
   }
 }
@@ -89,28 +116,40 @@ export async function PUT(request: NextRequest) {
 
   try {
     const body = await request.json()
-    const { id } = body
-
-    if (!id) {
-      return NextResponse.json({ error: "Goal ID is required" }, { status: 400 })
+    const parsed = goalUpdateSchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: "Validation failed", details: parsed.error.flatten().fieldErrors },
+        { status: 400 },
+      )
     }
 
+    const { id, coding, ...fields } = parsed.data
+
+    const existing = await prismaClinical.goal.findUnique({ where: { id }, select: { patientId: true } })
+    if (!existing) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 })
+    }
+
+    const forbidden = await requirePatientAccess(authResult, existing.patientId)
+    if (forbidden) return forbidden
+
     const data: Record<string, unknown> = {}
-    if (body.name !== undefined) data.name = body.name
-    if (body.lifecycleStatus !== undefined) data.lifecycleStatus = body.lifecycleStatus
-    if (body.expressedBy !== undefined) data.expressedBy = body.expressedBy || null
-    if (body.startDate !== undefined) data.startDate = body.startDate || null
-    if (body.note !== undefined) data.note = body.note || null
-    if (body.coding !== undefined) {
-      data.codingSystem = body.coding?.system || null
-      data.codingCode = body.coding?.code || null
-      data.codingDisplay = body.coding?.display || null
+    if (fields.name !== undefined) data.name = fields.name
+    if (fields.lifecycleStatus !== undefined) data.lifecycleStatus = fields.lifecycleStatus
+    if (fields.expressedBy !== undefined) data.expressedBy = fields.expressedBy || null
+    if (fields.startDate !== undefined) data.startDate = fields.startDate || null
+    if (fields.note !== undefined) data.note = fields.note || null
+    if (coding !== undefined) {
+      data.codingSystem = coding?.system || null
+      data.codingCode = coding?.code || null
+      data.codingDisplay = coding?.display || null
     }
 
     const item = await prismaClinical.goal.update({ where: { id }, data })
     return NextResponse.json(item)
   } catch (error) {
-    console.error("Clinical goal update error:", error)
+    logger.error("Clinical goal update error", error)
     return NextResponse.json({ error: "Failed to update goal" }, { status: 500 })
   }
 }
@@ -126,10 +165,18 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: "id parameter is required" }, { status: 400 })
     }
 
+    const existing = await prismaClinical.goal.findUnique({ where: { id }, select: { patientId: true } })
+    if (!existing) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 })
+    }
+
+    const forbidden = await requirePatientAccess(authResult, existing.patientId)
+    if (forbidden) return forbidden
+
     await prismaClinical.goal.delete({ where: { id } })
     return NextResponse.json({ success: true })
   } catch (error) {
-    console.error("Clinical goal delete error:", error)
+    logger.error("Clinical goal delete error", error)
     return NextResponse.json({ error: "Failed to delete goal" }, { status: 500 })
   }
 }

@@ -1,7 +1,24 @@
 import { NextRequest, NextResponse } from "next/server"
+import { z } from "zod"
 import { requireAuth, isSession } from "@/lib/auth-helpers"
 import { prismaClinical } from "@/lib/prisma-clinical"
 import { requirePatientAccess } from "@/lib/clinical-auth"
+import { logger } from "@/lib/logger"
+
+const newThreadSchema = z.object({
+  patientId: z.string().min(1),
+  topic: z.string().optional(),
+})
+
+const newMessageSchema = z.object({
+  threadId: z.string().min(1),
+  senderType: z.string().optional(),
+  senderRef: z.string().optional(),
+  text: z.string().min(1),
+  sentAt: z.string().optional(),
+  receivedAt: z.string().optional(),
+  status: z.string().optional(),
+})
 
 // GET /api/clinical/communication?patient={id} - Get threads with nested messages
 // GET /api/clinical/communication?thread={threadId} - Get messages in a thread
@@ -26,6 +43,9 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ error: "Thread not found" }, { status: 404 })
       }
 
+      const forbidden = await requirePatientAccess(authResult, thread.patientId)
+      if (forbidden) return forbidden
+
       return NextResponse.json(thread)
     }
 
@@ -46,7 +66,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ items: threads, total: threads.length })
   } catch (error) {
-    console.error("Clinical communication search error:", error)
+    logger.error("Clinical communication search error", error)
     return NextResponse.json({ error: "Failed to fetch messages" }, { status: 500 })
   }
 }
@@ -61,28 +81,42 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
 
-    if (body.patientId) {
-      const forbidden = await requirePatientAccess(authResult, body.patientId)
-      if (forbidden) return forbidden
-    }
-
     if (body.threadId) {
       // Add message to existing thread
+      const parsed = newMessageSchema.safeParse(body)
+      if (!parsed.success) {
+        return NextResponse.json(
+          { error: "Validation failed", details: parsed.error.flatten().fieldErrors },
+          { status: 400 },
+        )
+      }
+
+      const thread = await prismaClinical.thread.findUnique({
+        where: { id: parsed.data.threadId },
+        select: { patientId: true },
+      })
+      if (!thread) {
+        return NextResponse.json({ error: "Thread not found" }, { status: 404 })
+      }
+
+      const forbidden = await requirePatientAccess(authResult, thread.patientId)
+      if (forbidden) return forbidden
+
       const message = await prismaClinical.message.create({
         data: {
-          threadId: body.threadId,
-          senderType: body.senderType || "provider",
-          senderRef: body.senderRef || "",
-          text: body.text,
-          sentAt: body.sentAt || new Date().toISOString(),
-          receivedAt: body.receivedAt,
-          status: body.status || "completed",
+          threadId: parsed.data.threadId,
+          senderType: parsed.data.senderType || "provider",
+          senderRef: parsed.data.senderRef || "",
+          text: parsed.data.text,
+          sentAt: parsed.data.sentAt || new Date().toISOString(),
+          receivedAt: parsed.data.receivedAt,
+          status: parsed.data.status || "completed",
         },
       })
 
       // Touch thread updatedAt
       await prismaClinical.thread.update({
-        where: { id: body.threadId },
+        where: { id: parsed.data.threadId },
         data: { updatedAt: new Date() },
       })
 
@@ -90,16 +124,27 @@ export async function POST(request: NextRequest) {
     }
 
     // Create new thread
+    const parsed = newThreadSchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: "Validation failed", details: parsed.error.flatten().fieldErrors },
+        { status: 400 },
+      )
+    }
+
+    const forbidden = await requirePatientAccess(authResult, parsed.data.patientId)
+    if (forbidden) return forbidden
+
     const thread = await prismaClinical.thread.create({
       data: {
-        patientId: body.patientId,
-        topic: body.topic || "",
+        patientId: parsed.data.patientId,
+        topic: parsed.data.topic || "",
       },
     })
 
     return NextResponse.json({ id: thread.id })
   } catch (error) {
-    console.error("Clinical communication create error:", error)
+    logger.error("Clinical communication create error", error)
     return NextResponse.json({ error: "Failed to create message/thread" }, { status: 500 })
   }
 }

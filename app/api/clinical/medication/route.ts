@@ -1,70 +1,25 @@
-import { NextRequest, NextResponse } from "next/server"
-import { requireAuth, isSession } from "@/lib/auth-helpers"
-import { prismaClinical } from "@/lib/prisma-clinical"
-import { requirePatientAccess } from "@/lib/clinical-auth"
+import { z } from "zod"
+import { createClinicalCrudHandlers } from "@/lib/clinical-crud-factory"
 
-// GET /api/clinical/medication?patient={id}
-export async function GET(request: NextRequest) {
-  const authResult = await requireAuth()
-  if (!isSession(authResult)) return authResult
+const medicationSchema = z.object({
+  patientId: z.string().min(1),
+  name: z.string().optional(),
+  dose: z.string().optional(),
+  route: z.string().optional(),
+  frequency: z.string().optional(),
+  status: z.string().optional(),
+  authoredOn: z.string().optional(),
+  dosageText: z.string().optional(),
+  codingSystem: z.string().optional(),
+  codingCode: z.string().optional(),
+  codingDisplay: z.string().optional(),
+  note: z.string().optional(),
+})
 
-  try {
-    const patientId = request.nextUrl.searchParams.get("patient")
-    if (!patientId) {
-      return NextResponse.json({ error: "patient parameter is required" }, { status: 400 })
-    }
+const handlers = createClinicalCrudHandlers({
+  model: "medication",
+  schema: medicationSchema,
+  label: "medication",
+})
 
-    const forbidden = await requirePatientAccess(authResult, patientId)
-    if (forbidden) return forbidden
-
-    const items = await prismaClinical.medication.findMany({
-      where: { patientId },
-      orderBy: { createdAt: "desc" },
-    })
-
-    return NextResponse.json({ items, total: items.length })
-  } catch (error) {
-    console.error("Clinical medication search error:", error)
-    return NextResponse.json({ error: "Failed to fetch medications" }, { status: 500 })
-  }
-}
-
-// POST /api/clinical/medication - Create a new medication
-export async function POST(request: NextRequest) {
-  const authResult = await requireAuth()
-  if (!isSession(authResult)) return authResult
-
-  try {
-    const body = await request.json()
-    if (body.patientId) {
-      const forbidden = await requirePatientAccess(authResult, body.patientId)
-      if (forbidden) return forbidden
-    }
-    const item = await prismaClinical.medication.create({ data: body })
-    return NextResponse.json({ id: item.id })
-  } catch (error) {
-    console.error("Clinical medication create error:", error)
-    return NextResponse.json({ error: "Failed to create medication" }, { status: 500 })
-  }
-}
-
-// PUT /api/clinical/medication - Update a medication
-export async function PUT(request: NextRequest) {
-  const authResult = await requireAuth()
-  if (!isSession(authResult)) return authResult
-
-  try {
-    const body = await request.json()
-    const { id, ...data } = body
-
-    if (!id) {
-      return NextResponse.json({ error: "Medication ID is required" }, { status: 400 })
-    }
-
-    const item = await prismaClinical.medication.update({ where: { id }, data })
-    return NextResponse.json(item)
-  } catch (error) {
-    console.error("Clinical medication update error:", error)
-    return NextResponse.json({ error: "Failed to update medication" }, { status: 500 })
-  }
-}
+export const { GET, POST, PUT } = handlers
