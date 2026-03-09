@@ -5,6 +5,21 @@ import {
   mapAppPatientToFhirPatient,
 } from "@/lib/phenoml/fhir-mapper";
 import { isLocalBackendClient } from "@/lib/emr-backend";
+import { createDefaultTabs } from "@/lib/data/default-tabs";
+
+function mapLocalPatient(i: any): PatientData {
+  return {
+    id: i.id,
+    fhirId: i.id,
+    name: i.name || "",
+    mrn: i.mrn || "",
+    dob: i.dob || "",
+    sex: i.sex || "",
+    avatar: i.avatar,
+    summary: i.summary,
+    tabs: createDefaultTabs({ name: i.name || "", mrn: i.mrn || "", dob: i.dob || "", sex: i.sex || "" }),
+  };
+}
 
 export interface PatientSearchResult {
   patients: PatientData[];
@@ -24,7 +39,7 @@ export async function listFhirPatients(): Promise<PatientSearchResult> {
         return { patients: [], total: 0, error: data.error || "Failed to list patients" };
       }
       return {
-        patients: data.items.map((i: any) => ({ ...i, fhirId: i.id })),
+        patients: data.items.map((i: any) => mapLocalPatient(i)),
         total: data.total,
       };
     } catch (error) {
@@ -82,7 +97,7 @@ export async function searchFhirPatients(name: string): Promise<PatientSearchRes
         return { patients: [], total: 0, error: data.error || "Failed to search patients" };
       }
       return {
-        patients: data.items.map((i: any) => ({ ...i, fhirId: i.id })),
+        patients: data.items.map((i: any) => mapLocalPatient(i)),
         total: data.total,
       };
     } catch (error) {

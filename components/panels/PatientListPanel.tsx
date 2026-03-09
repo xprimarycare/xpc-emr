@@ -41,7 +41,7 @@ export function PatientListPanel() {
   }
 
   const handleSelectPatient = (patient: PatientData) => {
-    const existing = patients.find((p) => p.id === patient.id);
+    const existing = patients.find((p) => p.id === patient.id || (patient.fhirId && p.fhirId === patient.fhirId));
     if (existing) {
       setActivePatientId(existing.id);
     } else {
@@ -93,7 +93,7 @@ export function PatientListPanel() {
         {!isLoading && !error && filteredPatients.map((patient) => {
           const age = computeAge(patient.dob);
           const sexInitial = computeSexInitial(patient.sex);
-          const isOpen = patients.some((p) => p.id === patient.id);
+          const isOpen = patients.some((p) => p.id === patient.id || (patient.fhirId && p.fhirId === patient.fhirId));
 
           return (
             <button

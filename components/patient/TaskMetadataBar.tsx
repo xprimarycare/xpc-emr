@@ -15,7 +15,7 @@ export function TaskMetadataBar() {
   const { activePatient, updateTabProperties } = usePatient();
   const { activeTabId, tabContent } = useEditor();
 
-  const activeTab = activePatient?.tabs.find(t => t.id === activeTabId);
+  const activeTab = activePatient?.tabs?.find(t => t.id === activeTabId);
 
   const [status, setStatus] = useState<SaveStatus>('idle');
   const [error, setError] = useState<string | null>(null);

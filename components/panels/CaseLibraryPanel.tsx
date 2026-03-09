@@ -167,7 +167,7 @@ export function CaseLibraryPanel() {
       setActivePatientId(existing.id);
       // Navigate to the specific encounter tab if provided
       if (encounterFhirId) {
-        const tab = existing.tabs.find((t) => t.encounterFhirId === encounterFhirId);
+        const tab = existing.tabs?.find((t) => t.encounterFhirId === encounterFhirId);
         if (tab) setActiveTabId(tab.id);
       }
     } else {
